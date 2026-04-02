@@ -12,7 +12,7 @@ from campus_market_env.models import CampusMarketAction, CampusMarketStepResult
 class CampusMarketEnvClient(EnvClient):
     """Thin HTTP client for the FastAPI environment server."""
 
-    def __init__(self, base_url: str = "http://127.0.0.1:8080", timeout: float = 5.0) -> None:
+    def __init__(self, base_url: str = "http://127.0.0.1:8080/api", timeout: float = 5.0) -> None:
         self._base_url = base_url.rstrip("/")
         self._timeout = timeout
 

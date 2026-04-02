@@ -111,7 +111,7 @@ def choose_action(
 def main() -> None:
     load_env_file(Path(".env"))
     model_name = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-    base_url = os.environ.get("CAMPUS_MARKET_ENV_BASE_URL", "http://localhost:8080")
+    base_url = os.environ.get("CAMPUS_MARKET_ENV_BASE_URL", "http://localhost:8080/api")
     llm_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
     env = CampusMarketEnvClient(base_url=base_url)
 

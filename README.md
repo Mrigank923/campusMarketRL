@@ -31,7 +31,7 @@ from campus_market_env.client import CampusMarketEnvClient
 from campus_market_env.models import CampusMarketAction
 from campus_market_env.utils.enums import ShopTypeEnum
 
-env = CampusMarketEnvClient(base_url="http://localhost:8080")
+env = CampusMarketEnvClient(base_url="http://localhost:8080/api")
 result = env.reset(seed=42)
 
 result = env.step(
@@ -47,19 +47,17 @@ print(result.observation.model_dump())
 print(result.reward, result.done, result.info)
 ```
 
-### Build
+### Run everything
 ```bash
-docker build -t campus-market-env .
+docker build -t campus-market .
+docker run -p 8080:8080 campus-market
 ```
 
-### Run
-```bash
-docker run -p 8080:8080 campus-market-env
-```
+Open: `http://localhost:8080`
 
 ### Test
 ```bash
-curl http://localhost:8080/health
+curl http://localhost:8080/api/health
 ```
 
 ### Run baseline
