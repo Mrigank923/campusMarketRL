@@ -1,22 +1,27 @@
-# Python bytecode
+# Python
 __pycache__/
 *.py[cod]
+*$py.class
 
-# Virtual environments
+# Python virtual environments
 .venv/
 venv/
+env/
 
-# Build artifacts
+# Python packaging / build artifacts
 build/
 dist/
+site/
 *.egg-info/
 .eggs/
+pip-wheel-metadata/
 
-# Tool caches
+# Python tooling caches
 .pytest_cache/
 .mypy_cache/
 .ruff_cache/
 .coverage
+.coverage.*
 htmlcov/
 
 # Environment files
@@ -24,10 +29,27 @@ htmlcov/
 .env.*
 !.env.example
 
-# Editor and OS files
+# Frontend dependencies and build output
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+node_modules/
+.next/
+out/
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# OS / editor files
 .DS_Store
+Thumbs.db
 .idea/
 .vscode/
 
-# Local tooling
+# Local tooling / generated local state
 .codex
+
