@@ -1,0 +1,21 @@
+name: campus_market_env
+version: 0.1.0
+spec_version: 1
+
+description: >
+  A realistic campus market simulation RL environment with multi-agent competition,
+  student demand modeling, seasonal trends, and inventory dynamics.
+
+default_image: campus-market-env:latest
+
+client:
+  class_name: CampusMarketEnvClient
+  module: campus_market_env.client
+
+action:
+  class_name: CampusMarketAction
+  module: campus_market_env.models
+
+observation:
+  class_name: CampusMarketObservation
+  module: campus_market_env.models
