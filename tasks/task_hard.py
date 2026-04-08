@@ -8,9 +8,13 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+from tasks import ensure_source_package
+ensure_source_package()
+
 from campus_market_env.models import CampusMarketAction
 from campus_market_env.server.environment import CampusMarketEnv
 from campus_market_env.enums import ShopTypeEnum
+from structured_stdout import emit_end, emit_start
 
 TASK_NAME = "hard_full_horizon"
 TASK_SEED = 7
@@ -164,13 +168,16 @@ GRADING_CRITERIA = {
 
 
 if __name__ == "__main__":
+    emit_start(task=TASK_NAME, difficulty="hard", seed=TASK_SEED)
     res = run()
-    print(f"Task: {res.task_name}")
-    print(f"Steps completed:    {res.total_steps}")
-    print(f"Cumulative reward:  {res.cumulative_reward:.2f}")
-    print(f"Cumulative revenue: {res.cumulative_revenue:.2f}")
-    print(f"Avg satisfaction:   {res.avg_satisfaction:.4f}")
-    print(f"Avg reward/step:    {res.avg_reward:.4f}")
-    print(f"Stockout fraction:  {res.stockout_fraction:.2%}")
-    print(f"Final budget:       {res.final_budget:.2f}")
-    print(f"Final awareness:    {res.final_awareness:.4f}")
+    emit_end(
+        task=res.task_name,
+        steps=res.total_steps,
+        cumulative_reward=round(res.cumulative_reward, 2),
+        cumulative_revenue=round(res.cumulative_revenue, 2),
+        avg_satisfaction=round(res.avg_satisfaction, 4),
+        avg_reward=round(res.avg_reward, 4),
+        stockout_fraction=round(res.stockout_fraction, 4),
+        final_budget=round(res.final_budget, 2),
+        final_awareness=round(res.final_awareness, 4),
+    )

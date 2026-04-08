@@ -8,6 +8,7 @@ ENV PYTHONUNBUFFERED=1 \
 COPY requirements.txt .
 COPY pyproject.toml .
 COPY README.md .
+COPY structured_stdout.py .
 COPY __init__.py .
 COPY client.py .
 COPY config.py .
