@@ -21,7 +21,6 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY docs ./docs
 COPY static ./static
 COPY tasks ./tasks
-COPY run_agent.py .
 COPY test_env.py .
 COPY inference.py .
 COPY main.py .
