@@ -1,41 +1,39 @@
-"""Baseline OpenAI-driven evaluator for the campus market environment."""
+"""Sample-style inference script for the Campus Market environment."""
 
 from __future__ import annotations
 
+import json
 import os
+import textwrap
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Optional
 
 from openai import OpenAI
-from pydantic import BaseModel, ConfigDict, ValidationError
+from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
 from campus_market_env.client import CampusMarketEnvClient
-from campus_market_env.models import CampusMarketAction, CampusMarketStepResult
+from campus_market_env.config import MAX_DAYS_PER_EPISODE, PHASES_PER_DAY, REWARD_CLAMP_MAX
 from campus_market_env.enums import ShopTypeEnum
-
-SAFE_DEFAULT_ACTION: Final[dict[str, float | int | str]] = {
-    "price_adjustment": 0.0,
-    "marketing_spend": 0.0,
-    "restock_amount": 10,
-    "product_focus": ShopTypeEnum.FOOD.value,
-}
-PRODUCT_FOCUS_MAP: Final[dict[str, str]] = {
-    "CAFE": ShopTypeEnum.CAFE.value,
-    "FOOD": ShopTypeEnum.FOOD.value,
-    "TECH": ShopTypeEnum.TECH.value,
-    "STATIONARY": ShopTypeEnum.STATIONARY.value,
-}
+from campus_market_env.models import CampusMarketAction, CampusMarketObservation, CampusMarketStepResult
 
 
 class LLMActionResponse(BaseModel):
-    """Structured action returned by the LLM."""
+    """Structured action returned by the model."""
 
     model_config = ConfigDict(extra="forbid")
 
-    price_adjustment: float
-    marketing_spend: float
-    restock_amount: int
-    product_focus: Literal["CAFE", "FOOD", "TECH", "STATIONARY"]
+    price_adjustment: float = Field(ge=-1.0, le=1.0)
+    marketing_spend: float = Field(ge=0.0)
+    restock_amount: int = Field(ge=0)
+    product_focus: str
+
+    @field_validator("product_focus")
+    @classmethod
+    def validate_product_focus(cls, value: str) -> str:
+        normalized = value.strip().lower()
+        if normalized not in VALID_PRODUCT_FOCUS:
+            raise ValueError(f"product_focus must be one of {VALID_PRODUCT_FOCUS}")
+        return normalized
 
 
 def load_env_file(path: Path) -> None:
@@ -52,79 +50,270 @@ def load_env_file(path: Path) -> None:
         os.environ.setdefault(key.strip(), value.strip())
 
 
-def safe_default_action() -> CampusMarketAction:
-    return CampusMarketAction.model_validate(SAFE_DEFAULT_ACTION)
+load_env_file(Path(".env"))
+
+# Required by the submission format / sample script.
+LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
+API_KEY = os.getenv("HF_TOKEN") or os.getenv("API_KEY")
+API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
+MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
+
+# Environment-specific configuration.
+ENV_BASE_URL = os.getenv("CAMPUS_MARKET_ENV_BASE_URL", "http://localhost:7860/api")
+TASK_NAME = os.getenv("TASK_NAME", "campus_market_inference")
+BENCHMARK = os.getenv("BENCHMARK", "campus_market_env")
+MAX_STEPS = int(os.getenv("MAX_STEPS", str(MAX_DAYS_PER_EPISODE * PHASES_PER_DAY)))
+TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
+MAX_TOKENS = int(os.getenv("MAX_TOKENS", "250"))
+SUCCESS_SCORE_THRESHOLD = float(os.getenv("SUCCESS_SCORE_THRESHOLD", "0.1"))
+
+VALID_PRODUCT_FOCUS: Final[tuple[str, ...]] = tuple(shop.value for shop in ShopTypeEnum)
+MAX_TOTAL_REWARD: Final[float] = max(1.0, MAX_STEPS * REWARD_CLAMP_MAX)
+
+SYSTEM_PROMPT = textwrap.dedent(
+    """
+    You are controlling a campus shop in a reinforcement-learning environment.
+
+    Your goal is to maximize long-term reward while keeping revenue, satisfaction,
+    inventory, and awareness healthy across the episode.
+
+    Return exactly one JSON object with this schema:
+    {
+      "price_adjustment": float,   // between -1.0 and 1.0
+      "marketing_spend": float,    // >= 0
+      "restock_amount": int,       // >= 0
+      "product_focus": "cafe" | "food" | "tech" | "stationary"
+    }
+
+    Do not include markdown, explanations, or extra text.
+    """
+).strip()
 
 
-def build_prompt(result: CampusMarketStepResult) -> str:
-    return f"""
-You are controlling a campus shop in an RL environment.
+def sanitize_inline(value: str | None) -> str:
+    if value is None or value == "":
+        return "null"
+    return " ".join(value.splitlines()).strip() or "null"
 
-Goal:
-Maximize long-term revenue and customer satisfaction.
 
-Observation:
-{result.observation.model_dump_json()}
+def log_start(task: str, env: str, model: str) -> None:
+    print(
+        f"[START] task={sanitize_inline(task)} env={sanitize_inline(env)} model={sanitize_inline(model)}",
+        flush=True,
+    )
 
-Return action in JSON:
-{{
-  "price_adjustment": float (-1 to 1),
-  "marketing_spend": float,
-  "restock_amount": int,
-  "product_focus": "CAFE|FOOD|TECH|STATIONARY"
-}}
-""".strip()
+
+def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
+    print(
+        f"[STEP] step={step} action={sanitize_inline(action)} reward={reward:.2f} "
+        f"done={str(done).lower()} error={sanitize_inline(error)}",
+        flush=True,
+    )
+
+
+def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
+    rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
+        flush=True,
+    )
+
+
+def safe_default_action(observation: CampusMarketObservation) -> CampusMarketAction:
+    """Fallback heuristic used when the model response is unavailable or invalid."""
+
+    if observation.inventory_level < 0.25:
+        restock_amount = 60
+    elif observation.inventory_level < 0.45:
+        restock_amount = 30
+    elif observation.inventory_level < 0.65:
+        restock_amount = 12
+    else:
+        restock_amount = 4
+
+    if observation.customer_satisfaction < 0.45:
+        price_adjustment = -0.15
+    elif observation.trend_factor > 1.1 and observation.customer_satisfaction > 0.55:
+        price_adjustment = 0.10
+    elif observation.competitor_pressure > 0.60:
+        price_adjustment = -0.08
+    else:
+        price_adjustment = 0.02
+
+    if observation.awareness < 0.45:
+        marketing_spend = min(500.0, observation.monthly_budget * 0.08)
+    elif observation.customer_satisfaction < 0.50:
+        marketing_spend = min(300.0, observation.monthly_budget * 0.05)
+    else:
+        marketing_spend = min(180.0, observation.monthly_budget * 0.03)
+
+    if observation.trend_factor > 1.1:
+        product_focus = ShopTypeEnum.TECH.value
+    elif observation.trend_factor < 0.8:
+        product_focus = ShopTypeEnum.FOOD.value
+    elif observation.phase == "morning":
+        product_focus = ShopTypeEnum.CAFE.value
+    else:
+        product_focus = ShopTypeEnum.STATIONARY.value
+
+    return CampusMarketAction(
+        price_adjustment=round(price_adjustment, 2),
+        marketing_spend=round(marketing_spend, 2),
+        restock_amount=restock_amount,
+        product_focus=product_focus,
+    )
+
+
+def build_user_prompt(
+    step: int,
+    result: CampusMarketStepResult,
+    history: list[str],
+) -> str:
+    history_block = "\n".join(history[-5:]) if history else "None"
+    return textwrap.dedent(
+        f"""
+        Step: {step}
+        Observation:
+        {result.observation.model_dump_json()}
+
+        Previous steps:
+        {history_block}
+
+        Choose the next action that best improves long-term score.
+        Return JSON only.
+        """
+    ).strip()
+
+
+def parse_action_response(raw_text: str) -> LLMActionResponse:
+    cleaned = raw_text.strip()
+    if not cleaned:
+        raise ValueError("empty model response")
+
+    try:
+        parsed = json.loads(cleaned)
+    except json.JSONDecodeError:
+        start = cleaned.find("{")
+        end = cleaned.rfind("}")
+        if start == -1 or end == -1 or end <= start:
+            raise ValueError("model response did not contain a JSON object") from None
+        parsed = json.loads(cleaned[start : end + 1])
+
+    return LLMActionResponse.model_validate(parsed)
 
 
 def choose_action(
-    client: OpenAI,
+    client: OpenAI | None,
     result: CampusMarketStepResult,
-    model_name: str,
-) -> CampusMarketAction:
-    prompt = build_prompt(result)
+    step: int,
+    history: list[str],
+) -> tuple[CampusMarketAction, Optional[str]]:
+    """Query the model for an action, or fall back to a safe heuristic."""
+
+    if client is None:
+        return safe_default_action(result.observation), "missing HF_TOKEN/API_KEY"
+
+    prompt = build_user_prompt(step=step, result=result, history=history)
     try:
-        response = client.responses.parse(
-            model=model_name,
-            temperature=0,
-            input=[
-                {
-                    "role": "system",
-                    "content": "You are a deterministic RL policy. Output only a valid JSON action.",
-                },
+        completion = client.chat.completions.create(
+            model=MODEL_NAME,
+            messages=[
+                {"role": "system", "content": SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
             ],
-            text_format=LLMActionResponse,
+            temperature=TEMPERATURE,
+            max_tokens=MAX_TOKENS,
         )
-        parsed = response.output_parsed
-        if parsed is None:
-            return safe_default_action()
-        return CampusMarketAction(
+        content = completion.choices[0].message.content or ""
+        parsed = parse_action_response(content)
+        action = CampusMarketAction(
             price_adjustment=parsed.price_adjustment,
             marketing_spend=parsed.marketing_spend,
             restock_amount=parsed.restock_amount,
-            product_focus=PRODUCT_FOCUS_MAP[parsed.product_focus],
+            product_focus=parsed.product_focus,
         )
-    except (ValidationError, KeyError, ValueError, TypeError):
-        return safe_default_action()
+        return action, None
+    except (ValidationError, ValueError, TypeError, KeyError, IndexError, AttributeError) as exc:
+        return safe_default_action(result.observation), str(exc)
+    except Exception as exc:
+        return safe_default_action(result.observation), str(exc)
+
+
+def action_to_log_string(action: CampusMarketAction) -> str:
+    return action.model_dump_json()
 
 
 def main() -> None:
-    load_env_file(Path(".env"))
-    model_name = os.environ.get("OPENAI_MODEL", "gpt-4o-mini")
-    base_url = os.environ.get("CAMPUS_MARKET_ENV_BASE_URL", "http://localhost:7860/api")
-    llm_client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
-    env = CampusMarketEnvClient(base_url=base_url)
+    env = CampusMarketEnvClient(base_url=ENV_BASE_URL)
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY) if API_KEY else None
 
-    for task_id in range(3):
-        result = env.reset(seed=task_id)
-        total_reward = 0.0
+    history: list[str] = []
+    rewards: list[float] = []
+    steps_taken = 0
+    score = 0.0
+    success = False
 
-        while not result.done:
-            action = choose_action(llm_client, result, model_name)
-            result = env.step(action)
-            total_reward += result.reward
+    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
-        print(f"Task {task_id}: {total_reward:.4f}")
+    try:
+        result = env.reset()
+
+        for step in range(1, MAX_STEPS + 1):
+            if result.done:
+                break
+
+            action, action_error = choose_action(
+                client=client,
+                result=result,
+                step=step,
+                history=history,
+            )
+
+            reward = 0.0
+            done = True
+            step_error: Optional[str] = None
+
+            try:
+                result = env.step(action)
+                reward = float(result.reward or 0.0)
+                done = bool(result.done)
+                observation = result.observation
+            except Exception as exc:
+                observation = result.observation
+                step_error = str(exc) if action_error is None else f"{action_error}; {exc}"
+
+            rewards.append(reward)
+            steps_taken = step
+            log_step(
+                step=step,
+                action=action_to_log_string(action),
+                reward=reward,
+                done=done,
+                error=step_error,
+            )
+
+            history.append(
+                " | ".join(
+                    [
+                        f"step={step}",
+                        f"action={action_to_log_string(action)}",
+                        f"reward={reward:.2f}",
+                        f"day={observation.day}",
+                        f"phase={observation.phase}",
+                        f"satisfaction={observation.customer_satisfaction:.3f}",
+                        f"inventory={observation.inventory_level:.3f}",
+                        f"budget={observation.monthly_budget:.2f}",
+                    ]
+                )
+            )
+
+            if step_error is not None or done:
+                break
+
+        score = max(0.0, min(sum(rewards) / MAX_TOTAL_REWARD, 1.0))
+        success = score >= SUCCESS_SCORE_THRESHOLD
+    finally:
+        log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 if __name__ == "__main__":
