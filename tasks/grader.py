@@ -10,6 +10,7 @@ _project_root = str(Path(__file__).resolve().parent.parent)
 if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
+from structured_stdout import emit_end, emit_start, emit_step
 from tasks import task_easy, task_medium, task_hard
 
 
@@ -246,45 +247,38 @@ def format_report(
 
 
 def main() -> None:
-    print("\nRunning all the tasks\n")
+    emit_start(script="tasks.grader")
 
     task_grades: list[TaskGrade] = []
 
-
-    print("EASY task", end=" ", flush=True)
     t0 = time.perf_counter()
     easy_result = task_easy.run()
     easy_grade = grade_easy(easy_result)
     easy_grade.elapsed_seconds = round(time.perf_counter() - t0, 3)
     task_grades.append(easy_grade)
-    print(f"done ({easy_grade.elapsed_seconds:.2f}s)")
+    emit_step(task=easy_grade.task_name, difficulty="easy", elapsed_seconds=easy_grade.elapsed_seconds, grade=easy_grade.grade)
 
-    # ── Medium ──
-    print("MEDIUM task", end=" ", flush=True)
     t0 = time.perf_counter()
     medium_result = task_medium.run()
     medium_grade = grade_medium(medium_result)
     medium_grade.elapsed_seconds = round(time.perf_counter() - t0, 3)
     task_grades.append(medium_grade)
-    print(f"done ({medium_grade.elapsed_seconds:.2f}s)")
+    emit_step(task=medium_grade.task_name, difficulty="medium", elapsed_seconds=medium_grade.elapsed_seconds, grade=medium_grade.grade)
 
-    # ── Hard ──
-    print("HARD task", end=" ", flush=True)
     t0 = time.perf_counter()
     hard_result = task_hard.run()
     hard_grade = grade_hard(hard_result)
     hard_grade.elapsed_seconds = round(time.perf_counter() - t0, 3)
     task_grades.append(hard_grade)
-    print(f"done ({hard_grade.elapsed_seconds:.2f}s)")
+    emit_step(task=hard_grade.task_name, difficulty="hard", elapsed_seconds=hard_grade.elapsed_seconds, grade=hard_grade.grade)
 
     overall = compute_overall_grade(task_grades)
     report = format_report(task_grades, overall)
-    print(report)
 
     # Persist to file
     report_path = Path(__file__).resolve().parent / "grading_report.txt"
     report_path.write_text(report, encoding="utf-8")
-    print(f"  Report saved to {report_path}\n")
+    emit_end(overall_grade=overall, report_path=str(report_path))
 
 
 if __name__ == "__main__":

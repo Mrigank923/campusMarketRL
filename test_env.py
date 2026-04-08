@@ -7,6 +7,7 @@ import numpy as np
 from campus_market_env.models import CampusMarketAction
 from campus_market_env.server.environment import CampusMarketEnv
 from campus_market_env.enums import ShopTypeEnum
+from structured_stdout import emit_end, emit_start, emit_step
 
 try:
     from campus_market_env.gym_env import CampusMarketGymEnv
@@ -17,10 +18,11 @@ except ModuleNotFoundError:
 def main() -> None:
     rng = np.random.default_rng(7)
     shop_types = [shop_type.value for shop_type in ShopTypeEnum]
+    emit_start(script="test_env", seed=7)
 
     env = CampusMarketEnv(seed=7)
     observation = env.reset(seed=7)
-    print("reset:", observation.model_dump())
+    emit_step(kind="reset", observation=observation.model_dump(mode="json"))
 
     for step_index in range(10):
         action = CampusMarketAction(
@@ -30,22 +32,31 @@ def main() -> None:
             product_focus=str(rng.choice(shop_types)),
         )
         observation = env.step(action)
-        print(f"step {step_index} observation:", observation.model_dump())
-        print(f"step {step_index} reward:", observation.reward)
-        print(f"step {step_index} done:", observation.done)
-        print(f"step {step_index} info:", observation.info)
+        emit_step(
+            kind="env_step",
+            step=step_index,
+            action=action.model_dump(mode="json"),
+            observation=observation.model_dump(mode="json"),
+            reward=round(observation.reward, 2),
+            done=observation.done,
+            info=observation.info,
+        )
         if observation.done:
             break
 
     if CampusMarketGymEnv is None:
-        print("gym wrapper skipped: gymnasium is not installed in this environment")
+        emit_end(status="gym_skipped", reason="gymnasium_not_installed")
         return
 
     gym_env = CampusMarketGymEnv(seed=7)
     gym_observation, gym_info = gym_env.reset(seed=7)
-    print("gym reset vector:", gym_observation.tolist())
-    print("gym reset info keys:", sorted(gym_info.keys()))
-    print("market state keys:", sorted(env.market_state.model_dump().keys()))
+    emit_step(
+        kind="gym_reset",
+        vector=gym_observation.tolist(),
+        info_keys=sorted(gym_info.keys()),
+        market_state_keys=sorted(env.market_state.model_dump().keys()),
+    )
+    emit_end(status="ok", steps=step_index + 1 if "step_index" in locals() else 0)
 
 
 if __name__ == "__main__":

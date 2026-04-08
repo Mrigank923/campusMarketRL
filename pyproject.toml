@@ -32,6 +32,7 @@ campus_market_env = "."
 
 [tool.setuptools]
 packages = ["campus_market_env", "campus_market_env.server"]
+py-modules = ["structured_stdout"]
 include-package-data = true
 
 [tool.setuptools.package-data]

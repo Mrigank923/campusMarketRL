@@ -16,6 +16,7 @@ from campus_market_env.client import CampusMarketEnvClient
 from campus_market_env.config import MAX_DAYS_PER_EPISODE, PHASES_PER_DAY, REWARD_CLAMP_MAX
 from campus_market_env.enums import ShopTypeEnum
 from campus_market_env.models import CampusMarketAction, CampusMarketObservation
+from structured_stdout import emit_end, emit_start, emit_step
 
 
 class LLMActionResponse(BaseModel):
@@ -91,32 +92,20 @@ SYSTEM_PROMPT = textwrap.dedent(
 ).strip()
 
 
-def sanitize_inline(value: str | None) -> str:
-    if value is None or value == "":
-        return "null"
-    return " ".join(value.splitlines()).strip() or "null"
-
-
 def log_start(task: str, env: str, model: str) -> None:
-    print(
-        f"[START] task={sanitize_inline(task)} env={sanitize_inline(env)} model={sanitize_inline(model)}",
-        flush=True,
-    )
+    emit_start(task=task, env=env, model=model)
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    print(
-        f"[STEP] step={step} action={sanitize_inline(action)} reward={reward:.2f} "
-        f"done={str(done).lower()} error={sanitize_inline(error)}",
-        flush=True,
-    )
+    emit_step(step=step, action=action, reward=round(reward, 2), done=done, error=error)
 
 
 def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
-    rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
-    print(
-        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
-        flush=True,
+    emit_end(
+        success=success,
+        steps=steps,
+        score=round(score, 2),
+        rewards=[round(reward, 2) for reward in rewards],
     )
 
 
