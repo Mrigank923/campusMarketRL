@@ -2,10 +2,12 @@
 
 ## Important endpoints
 
-- `GET /api/health`
-- `POST /api/reset`
-- `POST /api/step`
-- `GET /api/state`
+- `GET /health`
+- `POST /reset`
+- `POST /step`
+- `GET /state`
+- `GET /schema`
+- `WS /ws`
 
 ## Important folders
 

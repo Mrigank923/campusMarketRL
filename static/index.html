@@ -93,26 +93,31 @@
     <main>
       <h1>Campus Market Environment</h1>
       <p>
-        This Space runs the campus market reinforcement-learning environment as a single FastAPI service.
-        Use the API endpoints below to reset the environment, step through the simulation, and inspect state.
+        This Space runs the campus market reinforcement-learning environment as an OpenEnv service.
+        Use the endpoints below to reset the environment, step through the simulation, inspect state,
+        and connect with a persistent OpenEnv client session.
       </p>
 
       <div class="card-grid">
         <section class="card">
           <strong>Health</strong>
-          <code>GET /api/health</code>
+          <code>GET /health</code>
         </section>
         <section class="card">
           <strong>Reset</strong>
-          <code>POST /api/reset</code>
+          <code>POST /reset</code>
         </section>
         <section class="card">
           <strong>Step</strong>
-          <code>POST /api/step</code>
+          <code>POST /step</code>
         </section>
         <section class="card">
           <strong>State</strong>
-          <code>GET /api/state</code>
+          <code>GET /state</code>
+        </section>
+        <section class="card">
+          <strong>Session</strong>
+          <code>WS /ws</code>
         </section>
       </div>
 

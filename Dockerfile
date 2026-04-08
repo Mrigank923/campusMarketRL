@@ -13,6 +13,8 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY campus_market_env ./campus_market_env
 COPY docs ./docs
 COPY static ./static
+COPY test_env.py .
+COPY inference.py .
 COPY main.py .
 RUN pip install --no-cache-dir --no-deps .
 

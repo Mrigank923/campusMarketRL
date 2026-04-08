@@ -53,5 +53,4 @@ Thumbs.db
 # Local tooling / generated local state
 .codex
 
-campus_market_env/gym_env.py
 run_agent.py

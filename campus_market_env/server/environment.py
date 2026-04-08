@@ -3,7 +3,11 @@
 from __future__ import annotations
 
 import random
+from typing import Any
 from uuid import uuid4
+
+from openenv.core.env_server.interfaces import Environment
+from openenv.core.env_server.types import EnvironmentMetadata
 
 from campus_market_env.models import (
     CampusMarketAction,
@@ -18,25 +22,34 @@ InfoValue = str | int | float | bool
 InfoDict = dict[str, InfoValue]
 
 
-class CampusMarketEnv:
+class CampusMarketEnv(
+    Environment[CampusMarketAction, CampusMarketObservation, CampusMarketState]
+):
     """Deterministic campus market environment with session and market state."""
 
     def __init__(self, seed: int | None = None) -> None:
+        super().__init__()
         self._seed = 0 if seed is None else seed
         self._rng = random.Random(self._seed)
         self._state = CampusMarketSessionState(episode_id=str(uuid4()), step_count=0)
         self._market_state = create_initial_state(episode_id=self._state.episode_id)
         self._last_observation: CampusMarketObservation | None = None
 
-    def reset(self, seed: int | None = None) -> CampusMarketObservation:
+    def reset(
+        self,
+        seed: int | None = None,
+        episode_id: str | None = None,
+        **kwargs: Any,
+    ) -> CampusMarketObservation:
         """Reset the simulation and return the opening observation."""
+        del kwargs
 
         if seed is not None:
             self._seed = seed
         self._rng = random.Random(self._seed)
 
         self._state = CampusMarketSessionState(
-            episode_id=str(uuid4()),
+            episode_id=episode_id or str(uuid4()),
             step_count=0,
         )
         self._market_state = create_initial_state(episode_id=self._state.episode_id)
@@ -55,8 +68,14 @@ class CampusMarketEnv:
         )
         return self._last_observation
 
-    def step(self, action: CampusMarketAction) -> CampusMarketObservation:
+    def step(
+        self,
+        action: CampusMarketAction,
+        timeout_s: float | None = None,
+        **kwargs: Any,
+    ) -> CampusMarketObservation:
         """Execute one market action and return the next observation."""
+        del timeout_s, kwargs
 
         current_state = self.market_state
         if current_state.done:
@@ -94,8 +113,14 @@ class CampusMarketEnv:
         return self._last_observation
 
     @property
-    def state(self) -> CampusMarketSessionState:
-        return self._state
+    def state(self) -> CampusMarketState:
+        return self._market_state.model_copy(
+            update={
+                "episode_id": self._state.episode_id,
+                "step_count": self._state.step_count,
+                "total_steps": self._state.step_count,
+            },
+        )
 
     @property
     def market_state(self) -> CampusMarketState:
@@ -103,6 +128,13 @@ class CampusMarketEnv:
 
     def _next_step_seed(self) -> int:
         return self._rng.randint(1, 1_000_000_000)
+
+    def get_metadata(self) -> EnvironmentMetadata:
+        return EnvironmentMetadata(
+            name="campus_market_env",
+            description="Campus market reinforcement-learning environment.",
+            version="0.1.0",
+        )
 
     def _build_info(
         self,

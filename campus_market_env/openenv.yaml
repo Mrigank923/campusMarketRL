@@ -6,7 +6,7 @@ description: >
   A realistic campus market simulation RL environment with multi-agent competition,
   student demand modeling, seasonal trends, and inventory dynamics.
 
-default_image: campus-market-env:latest
+default_image: campus-market:latest
 
 client:
   class_name: CampusMarketEnvClient

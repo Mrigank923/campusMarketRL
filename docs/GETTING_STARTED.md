@@ -21,7 +21,7 @@ docker run -p 7860:7860 campus-market
 4. Verify the API:
 
 ```bash
-curl http://localhost:7860/api/health
+curl http://localhost:7860/health
 ```
 
 ## Local Python setup
