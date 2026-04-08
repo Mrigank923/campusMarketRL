@@ -7,7 +7,7 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from ..config import (
+from campus_market_env.config import (
     AUTO_RESTOCK_TARGET_LEVEL,
     AUTO_RESTOCK_UNIT_COST,
     ACTIVE_TRAFFIC_MULTIPLIER,
@@ -22,38 +22,41 @@ from ..config import (
     EVENT_COMPETITOR_DISCOUNT_PROBABILITY,
     EVENT_INFLATION_PROBABILITY,
     EVENT_SUPPLY_SHORTAGE_PROBABILITY,
-    EXCESS_MARKETING_PENALTY_DIVISOR,
-    EXCESS_MARKETING_THRESHOLD,
     INFLATION_PRICE_MULTIPLIER,
+    INVENTORY_BALANCE_PENALTY_MULTIPLIER,
     INVENTORY_CAPACITY_UNITS,
+    INVENTORY_PROGRESS_REWARD_WEIGHT,
+    INVENTORY_TARGET_LEVEL,
+    INVENTORY_TARGET_TOLERANCE,
     INVENTORY_THRESHOLD,
     MEMORY_WINDOW_DAYS,
     MONTH_LENGTH_DAYS,
     MORNING_TRAFFIC_MULTIPLIER,
     OVERPRICING_PENALTY_MULTIPLIER,
-    OVERPRICING_THRESHOLD,
     OVERSTOCK_LEVEL,
     OVERSTOCK_PENALTY_MULTIPLIER,
+    PROFIT_NORMALIZATION_SCALE,
+    PROFIT_REWARD_WEIGHT,
     QUARTER_LENGTH_DAYS,
     REWARD_CLAMP_MAX,
     REWARD_CLAMP_MIN,
-    REWARD_SMOOTHING_WEIGHT,
+    SATISFACTION_DELTA_WEIGHT,
     STOCKOUT_REWARD_PENALTY,
     SUPPLY_SHORTAGE_INVENTORY_DELTA,
 )
-from ..models import (
+from campus_market_env.models import (
     CampusMarketAction,
     CampusMarketObservation,
     CampusMarketState,
 )
-from .competitor_model import (
+from campus_market_env.server.competitor_model import (
     CompetitorConfig,
     compute_competitor_pressure as calculate_competitor_pressure,
     generate_competitors,
 )
-from .student_model import StudentCluster, generate_student_clusters
-from .trend_model import get_trend, get_trend_multiplier
-from ..enums import PhaseEnum, ShopTypeEnum, TrendTypeEnum
+from campus_market_env.server.student_model import StudentCluster, generate_student_clusters
+from campus_market_env.server.trend_model import get_trend, get_trend_multiplier
+from campus_market_env.enums import PhaseEnum, ShopTypeEnum, TrendTypeEnum
 
 InfoValue = str | int | float | bool
 
@@ -91,9 +94,6 @@ SATISFACTION_INVENTORY_WEIGHT = 0.1
 SATISFACTION_STOCKOUT_PENALTY = 0.28
 
 BASE_PRICE_ADJUSTMENT_WEIGHT = 0.35
-COMPETITOR_REWARD_WEIGHT = 2.5
-MEMORY_REVENUE_REWARD_WEIGHT = 0.004
-MEMORY_SATISFACTION_REWARD_WEIGHT = 6.0
 
 
 class RandomEventImpact(BaseModel):
@@ -376,38 +376,56 @@ def apply_random_events(
     return RandomEventImpact()
 
 
+def compute_inventory_penalties(inventory_level: float) -> tuple[float, float, float]:
+    inventory_deviation = max(
+        0.0,
+        abs(inventory_level - INVENTORY_TARGET_LEVEL) - INVENTORY_TARGET_TOLERANCE,
+    )
+    inventory_balance_penalty = inventory_deviation * INVENTORY_BALANCE_PENALTY_MULTIPLIER
+    overstock_penalty = max(0.0, inventory_level - OVERSTOCK_LEVEL) * OVERSTOCK_PENALTY_MULTIPLIER
+    total_inventory_penalty = inventory_balance_penalty + overstock_penalty
+    return inventory_balance_penalty, overstock_penalty, total_inventory_penalty
+
+
 def compute_reward(
     revenue: float,
     satisfaction: float,
+    previous_satisfaction: float,
     stockout_flag: bool,
+    previous_inventory_level: float,
     inventory_level: float,
-    competitor_pressure: float,
     action: CampusMarketAction,
+    auto_restock_cost: float,
+    event_name: str,
 ) -> float:
-    overstock_penalty = 0.0
-    if inventory_level > OVERSTOCK_LEVEL:
-        overstock_penalty = (inventory_level - OVERSTOCK_LEVEL) * OVERSTOCK_PENALTY_MULTIPLIER
+    """Compute a profit-first reward with continuous business-health penalties."""
 
-    overpricing_penalty = 0.0
-    if action.price_adjustment > OVERPRICING_THRESHOLD:
-        overpricing_penalty = (
-            (action.price_adjustment - OVERPRICING_THRESHOLD) * OVERPRICING_PENALTY_MULTIPLIER
-        )
+    manual_restock_cost = action.restock_amount * AUTO_RESTOCK_UNIT_COST
+    gross_profit = revenue - action.marketing_spend - manual_restock_cost - auto_restock_cost
+    normalized_profit = gross_profit / PROFIT_NORMALIZATION_SCALE
+    satisfaction_delta = satisfaction - previous_satisfaction
 
-    excess_marketing_penalty = 0.0
-    if action.marketing_spend > EXCESS_MARKETING_THRESHOLD:
-        excess_marketing_penalty = (
-            (action.marketing_spend - EXCESS_MARKETING_THRESHOLD) / EXCESS_MARKETING_PENALTY_DIVISOR
-        )
+    _, _, previous_inventory_penalty = compute_inventory_penalties(previous_inventory_level)
+    inventory_balance_penalty, overstock_penalty, inventory_penalty = compute_inventory_penalties(
+        inventory_level,
+    )
+    inventory_progress_reward = (
+        previous_inventory_penalty - inventory_penalty
+    ) * INVENTORY_PROGRESS_REWARD_WEIGHT
+    exogenous_stockout = event_name == "supply_shortage" and stockout_flag
+    controllable_stockout_penalty = (
+        0.0 if (not stockout_flag or exogenous_stockout) else STOCKOUT_REWARD_PENALTY
+    )
+    overpricing_penalty = max(0.0, action.price_adjustment) * OVERPRICING_PENALTY_MULTIPLIER
 
     reward = (
-        (revenue * 0.01)
-        + (satisfaction * 10.0)
-        - (float(stockout_flag) * STOCKOUT_REWARD_PENALTY)
+        (normalized_profit * PROFIT_REWARD_WEIGHT)
+        + (satisfaction_delta * SATISFACTION_DELTA_WEIGHT)
+        - inventory_balance_penalty
         - overstock_penalty
+        + inventory_progress_reward
+        - controllable_stockout_penalty
         - overpricing_penalty
-        - excess_marketing_penalty
-        - (competitor_pressure * COMPETITOR_REWARD_WEIGHT)
     )
     return round(clamp(reward, REWARD_CLAMP_MIN, REWARD_CLAMP_MAX), 4)
 
@@ -417,16 +435,41 @@ def smooth_reward(
     revenue_memory: list[float],
     satisfaction_memory: list[float],
 ) -> float:
-    memory_revenue_signal = average_or_default(revenue_memory, 0.0) * MEMORY_REVENUE_REWARD_WEIGHT
-    memory_satisfaction_signal = average_or_default(
-        satisfaction_memory,
-        DEFAULT_CUSTOMER_SATISFACTION,
-    ) * MEMORY_SATISFACTION_REWARD_WEIGHT
-    smoothed = (
-        (base_reward * REWARD_SMOOTHING_WEIGHT)
-        + ((memory_revenue_signal + memory_satisfaction_signal) * (1.0 - REWARD_SMOOTHING_WEIGHT))
+    """Keep the hook for compatibility while returning the unsmoothed reward."""
+
+    _ = revenue_memory, satisfaction_memory
+    return round(clamp(base_reward, REWARD_CLAMP_MIN, REWARD_CLAMP_MAX), 4)
+
+
+def constrain_action_by_budget(
+    action: CampusMarketAction,
+    available_budget: float,
+) -> tuple[CampusMarketAction, dict[str, float | int]]:
+    """Clip spend-heavy actions to what the current budget can actually afford."""
+
+    capped_marketing_spend = min(action.marketing_spend, max(0.0, available_budget))
+    remaining_budget = max(0.0, available_budget - capped_marketing_spend)
+    max_affordable_restock = int(remaining_budget // AUTO_RESTOCK_UNIT_COST)
+    capped_restock_amount = min(action.restock_amount, max_affordable_restock)
+
+    constrained_action = action.model_copy(
+        update={
+            "marketing_spend": capped_marketing_spend,
+            "restock_amount": capped_restock_amount,
+        },
     )
-    return round(clamp(smoothed, REWARD_CLAMP_MIN, REWARD_CLAMP_MAX), 4)
+    budget_limited_action = (
+        abs(action.marketing_spend - constrained_action.marketing_spend) > 1e-6
+        or action.restock_amount != constrained_action.restock_amount
+    )
+    debug = {
+        "requested_marketing_spend": round(action.marketing_spend, 2),
+        "executed_marketing_spend": round(constrained_action.marketing_spend, 2),
+        "requested_restock_amount": action.restock_amount,
+        "executed_restock_amount": constrained_action.restock_amount,
+        "budget_limited_action": budget_limited_action,
+    }
+    return constrained_action, debug
 
 
 def build_initial_observation(
@@ -518,6 +561,15 @@ def compute_step(
         ),
     )
     competitor_pressure = calculate_competitor_pressure(product_focus, competitors)
+    budget_start = reset_monthly_budget(
+        previous_budget=previous_observation.monthly_budget,
+        day=state.current_day,
+        phase=state.current_phase,
+    )
+    executable_action, budget_debug = constrain_action_by_budget(
+        action=action,
+        available_budget=budget_start,
+    )
 
     recent_revenue = average_or_default(state.last_7_days_revenue, 0.0)
     recent_satisfaction = average_or_default(
@@ -526,7 +578,7 @@ def compute_step(
     )
     awareness = compute_awareness(
         previous_awareness=previous_observation.awareness,
-        marketing_spend=action.marketing_spend,
+        marketing_spend=executable_action.marketing_spend,
         recent_revenue=recent_revenue,
         recent_satisfaction=recent_satisfaction,
         competitor_pressure=competitor_pressure,
@@ -540,27 +592,30 @@ def compute_step(
         trend=trend,
     )
     conversion = compute_conversion(
-        price_adjustment=action.price_adjustment,
+        price_adjustment=executable_action.price_adjustment,
         price_sensitivity=price_sensitivity,
         satisfaction=previous_observation.customer_satisfaction,
         trend=trend,
     )
-    effective_base_price = BASE_PRICE * (1.0 + (action.price_adjustment * BASE_PRICE_ADJUSTMENT_WEIGHT))
+    effective_base_price = BASE_PRICE * (
+        1.0 + (executable_action.price_adjustment * BASE_PRICE_ADJUSTMENT_WEIGHT)
+    )
     revenue = compute_revenue(
         traffic=traffic,
         conversion=conversion,
         base_price=effective_base_price,
     )
     sales = estimate_sales(traffic=traffic, conversion=conversion)
+    manual_restock_cost = round(executable_action.restock_amount * AUTO_RESTOCK_UNIT_COST, 2)
     auto_restock_cost = compute_auto_restock_cost(
         current_inventory=previous_observation.inventory_level,
         sales=sales,
-        restock_amount=action.restock_amount,
+        restock_amount=executable_action.restock_amount,
     )
     inventory_level, stockout_flag = update_inventory(
         current_inventory=previous_observation.inventory_level,
         sales=sales,
-        restock_amount=action.restock_amount,
+        restock_amount=executable_action.restock_amount,
     )
     satisfaction = compute_satisfaction(
         conversion=conversion,
@@ -600,13 +655,14 @@ def compute_step(
             base_price=effective_base_price,
         )
 
-    budget_start = reset_monthly_budget(
-        previous_budget=previous_observation.monthly_budget,
-        day=state.current_day,
-        phase=state.current_phase,
-    )
     monthly_budget = round(
-        max(0.0, budget_start - action.marketing_spend - auto_restock_cost),
+        max(
+            0.0,
+            budget_start
+            - executable_action.marketing_spend
+            - manual_restock_cost
+            - auto_restock_cost,
+        ),
         2,
     )
     market_sentiment = compute_market_sentiment(
@@ -614,14 +670,27 @@ def compute_step(
         competitor_pressure=adjusted_competitor_pressure,
         recent_satisfaction=recent_satisfaction,
     )
+    (
+        inventory_balance_penalty,
+        overstock_penalty,
+        current_inventory_penalty,
+    ) = compute_inventory_penalties(inventory_level)
+    _, _, previous_inventory_penalty = compute_inventory_penalties(previous_observation.inventory_level)
+    inventory_progress_reward = round(
+        (previous_inventory_penalty - current_inventory_penalty) * INVENTORY_PROGRESS_REWARD_WEIGHT,
+        4,
+    )
 
     base_reward = compute_reward(
         revenue=revenue,
         satisfaction=satisfaction,
+        previous_satisfaction=previous_observation.customer_satisfaction,
         stockout_flag=stockout_flag,
+        previous_inventory_level=previous_observation.inventory_level,
         inventory_level=inventory_level,
-        competitor_pressure=adjusted_competitor_pressure,
-        action=action,
+        action=executable_action,
+        auto_restock_cost=auto_restock_cost,
+        event_name=event.event_name,
     )
     reward = smooth_reward(
         base_reward=base_reward,
@@ -655,8 +724,20 @@ def compute_step(
         "event": event.event_name,
         "event_price_multiplier": round(event.base_price_multiplier, 4),
         "event_inventory_delta": round(event.inventory_delta, 4),
+        "budget_start": round(budget_start, 2),
+        "manual_restock_cost": manual_restock_cost,
         "auto_restock_cost": auto_restock_cost,
         "effective_base_price": round(effective_base_price, 2),
+        "inventory_balance_penalty": round(inventory_balance_penalty, 4),
+        "overstock_penalty": round(overstock_penalty, 4),
+        "previous_inventory_penalty": round(previous_inventory_penalty, 4),
+        "current_inventory_penalty": round(current_inventory_penalty, 4),
+        "inventory_progress_reward": inventory_progress_reward,
+        "gross_profit": round(
+            revenue - executable_action.marketing_spend - manual_restock_cost - auto_restock_cost,
+            2,
+        ),
         "base_reward": base_reward,
+        **budget_debug,
     }
     return StepComputation(observation=observation, reward=reward, debug=debug)
