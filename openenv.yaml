@@ -10,12 +10,12 @@ default_image: campus-market:latest
 
 client:
   class_name: CampusMarketEnvClient
-  module: campus_market_env.client
+  module: client
 
 action:
   class_name: CampusMarketAction
-  module: campus_market_env.models
+  module: models
 
 observation:
   class_name: CampusMarketObservation
-  module: campus_market_env.models
+  module: models

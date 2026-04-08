@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from campus_market_env.config import MAX_DAYS_PER_EPISODE, MEMORY_WINDOW_DAYS, PHASES_PER_DAY
-from campus_market_env.models import CampusMarketState
-from campus_market_env.enums import PhaseEnum
+from ..config import MAX_DAYS_PER_EPISODE, MEMORY_WINDOW_DAYS, PHASES_PER_DAY
+from ..models import CampusMarketState
+from ..enums import PhaseEnum
 
 PHASE_SEQUENCE: tuple[str, ...] = (
     PhaseEnum.MORNING.value,

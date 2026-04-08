@@ -28,21 +28,21 @@ It now follows the real OpenEnv SDK pattern:
 
 ```text
 .
-├── campus_market_env/
-│   ├── client.py
-│   ├── config.py
-│   ├── enums.py
-│   ├── gym_env.py
-│   ├── models.py
-│   ├── openenv.yaml
-│   └── server/
-│       ├── app.py
-│       ├── competitor_model.py
-│       ├── engine.py
-│       ├── environment.py
-│       ├── state_manager.py
-│       ├── student_model.py
-│       └── trend_model.py
+├── __init__.py
+├── client.py
+├── config.py
+├── enums.py
+├── gym_env.py
+├── models.py
+├── openenv.yaml
+├── server/
+│   ├── app.py
+│   ├── competitor_model.py
+│   ├── engine.py
+│   ├── environment.py
+│   ├── state_manager.py
+│   ├── student_model.py
+│   └── trend_model.py
 ├── docs/
 ├── static/
 ├── Dockerfile

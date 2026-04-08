@@ -7,7 +7,7 @@ ENV PYTHONUNBUFFERED=1 \
 
 COPY . /app
 
-RUN pip install --no-cache-dir -r campus_market_env/server/requirements.txt \
+RUN pip install --no-cache-dir -r server/requirements.txt \
     && pip install --no-cache-dir .
 
 EXPOSE 7860

@@ -4,13 +4,13 @@ from __future__ import annotations
 
 import random
 
-from campus_market_env.config import (
+from ..config import (
     TREND_MULTIPLIER_EXAM,
     TREND_MULTIPLIER_FESTIVAL,
     TREND_MULTIPLIER_HOLIDAY,
     TREND_MULTIPLIER_NORMAL,
 )
-from campus_market_env.enums import TrendTypeEnum
+from ..enums import TrendTypeEnum
 
 
 def get_trend(day: int, quarter: int, seed: int | None = None) -> TrendTypeEnum:

@@ -7,7 +7,7 @@ from typing import Any
 from openenv.core import EnvClient
 from openenv.core.client_types import StepResult
 
-from campus_market_env.models import CampusMarketAction, CampusMarketObservation, CampusMarketState
+from .models import CampusMarketAction, CampusMarketObservation, CampusMarketState
 
 
 class CampusMarketEnvClient(

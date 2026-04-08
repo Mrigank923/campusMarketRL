@@ -10,7 +10,7 @@ import numpy as np
 from gymnasium import spaces
 from numpy.typing import NDArray
 
-from campus_market_env.config import (
+from .config import (
     DEFAULT_BUDGET,
     GYM_MARKETING_SPEND_MAX,
     GYM_OBSERVATION_VECTOR_SIZE,
@@ -20,9 +20,9 @@ from campus_market_env.config import (
     MAX_DAYS_PER_EPISODE,
     OBSERVATION_FEATURE_NAMES,
 )
-from campus_market_env.models import CampusMarketAction, CampusMarketObservation
-from campus_market_env.server.environment import CampusMarketEnv
-from campus_market_env.enums import PhaseEnum, ShopTypeEnum
+from .models import CampusMarketAction, CampusMarketObservation
+from .server.environment import CampusMarketEnv
+from .enums import PhaseEnum, ShopTypeEnum
 
 ObservationVector: TypeAlias = NDArray[np.float32]
 RawActionMapping: TypeAlias = Mapping[str, int | float | str | NDArray[np.float32]]
