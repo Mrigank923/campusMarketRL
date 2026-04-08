@@ -1,53 +1,39 @@
-"""HTTP client for the campus market environment server."""
+"""OpenEnv client for the campus market environment server."""
 
 from __future__ import annotations
 
-import json
-from urllib import error, request
+from typing import Any
 
-from campus_market_env.models import CampusMarketAction, CampusMarketStepResult
+from openenv.core import EnvClient
+from openenv.core.client_types import StepResult
+
+from campus_market_env.models import CampusMarketAction, CampusMarketObservation, CampusMarketState
 
 
-class CampusMarketEnvClient:
-    """Thin HTTP client for the FastAPI environment server."""
+class CampusMarketEnvClient(
+    EnvClient[CampusMarketAction, CampusMarketObservation, CampusMarketState]
+):
+    """OpenEnv WebSocket client for the campus market environment server."""
 
-    def __init__(self, base_url: str = "http://127.0.0.1:7860/api", timeout: float = 5.0) -> None:
-        self._base_url = base_url.rstrip("/")
-        self._timeout = timeout
+    def _step_payload(self, action: CampusMarketAction) -> dict[str, Any]:
+        return action.model_dump(mode="json")
 
-    def reset(self, seed: int | None = None) -> CampusMarketStepResult:
-        payload = {"seed": seed}
-        response = self._request("POST", "/reset", payload)
-        return CampusMarketStepResult.model_validate(response)
+    def _parse_result(self, payload: dict[str, Any]) -> StepResult[CampusMarketObservation]:
+        obs_data = dict(payload.get("observation", {}))
+        if "reward" not in obs_data and "reward" in payload:
+            obs_data["reward"] = payload.get("reward")
+        if "done" not in obs_data and "done" in payload:
+            obs_data["done"] = payload.get("done")
 
-    def step(self, action: CampusMarketAction) -> CampusMarketStepResult:
-        payload = action.model_dump(mode="json")
-        response = self._request("POST", "/step", payload)
-        return CampusMarketStepResult.model_validate(response)
+        observation = CampusMarketObservation.model_validate(obs_data)
+        reward = payload.get("reward", observation.reward)
+        done = payload.get("done", observation.done)
 
-    def _request(
-        self,
-        method: str,
-        path: str,
-        payload: dict[str, int | float | str | None],
-    ) -> dict[str, object]:
-        data = json.dumps(payload).encode("utf-8")
-        http_request = request.Request(
-            url=f"{self._base_url}{path}",
-            data=data,
-            headers={"Content-Type": "application/json"},
-            method=method,
+        return StepResult(
+            observation=observation,
+            reward=float(reward) if reward is not None else None,
+            done=bool(done),
         )
-        try:
-            with request.urlopen(http_request, timeout=self._timeout) as response:
-                body = response.read().decode("utf-8")
-        except error.HTTPError as exc:
-            details = exc.read().decode("utf-8")
-            raise RuntimeError(f"Request failed with status {exc.code}: {details}") from exc
-        except error.URLError as exc:
-            raise RuntimeError(f"Unable to connect to environment server: {exc.reason}") from exc
 
-        parsed = json.loads(body)
-        if not isinstance(parsed, dict):
-            raise RuntimeError("Server response was not a JSON object.")
-        return parsed
+    def _parse_state(self, payload: dict[str, Any]) -> CampusMarketState:
+        return CampusMarketState.model_validate(payload)

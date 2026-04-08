@@ -5,7 +5,7 @@
 It includes:
 
 - the transport models for actions, observations, and step results
-- an HTTP client for `/api/reset` and `/api/step`
+- an OpenEnv `EnvClient` implementation for `/reset`, `/step`, `/state`, and `/ws`
 - the in-process simulation environment
 - a Gymnasium wrapper for local RL experiments
 - `openenv.yaml` metadata for OpenEnv-style tooling
@@ -81,5 +81,5 @@ python main.py
 Then point the client to:
 
 ```text
-http://localhost:7860/api
+http://localhost:7860
 ```

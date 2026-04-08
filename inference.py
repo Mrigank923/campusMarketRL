@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import os
 import textwrap
@@ -14,7 +15,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_valida
 from campus_market_env.client import CampusMarketEnvClient
 from campus_market_env.config import MAX_DAYS_PER_EPISODE, PHASES_PER_DAY, REWARD_CLAMP_MAX
 from campus_market_env.enums import ShopTypeEnum
-from campus_market_env.models import CampusMarketAction, CampusMarketObservation, CampusMarketStepResult
+from campus_market_env.models import CampusMarketAction, CampusMarketObservation
 
 
 class LLMActionResponse(BaseModel):
@@ -59,7 +60,7 @@ API_BASE_URL = os.getenv("API_BASE_URL", "https://router.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 
 # Environment-specific configuration.
-ENV_BASE_URL = os.getenv("CAMPUS_MARKET_ENV_BASE_URL", "http://localhost:7860/api")
+ENV_BASE_URL = os.getenv("CAMPUS_MARKET_ENV_BASE_URL", "http://localhost:7860")
 TASK_NAME = os.getenv("TASK_NAME", "campus_market_inference")
 BENCHMARK = os.getenv("BENCHMARK", "campus_market_env")
 MAX_STEPS = int(os.getenv("MAX_STEPS", str(MAX_DAYS_PER_EPISODE * PHASES_PER_DAY)))
@@ -166,7 +167,7 @@ def safe_default_action(observation: CampusMarketObservation) -> CampusMarketAct
 
 def build_user_prompt(
     step: int,
-    result: CampusMarketStepResult,
+    observation: CampusMarketObservation,
     history: list[str],
 ) -> str:
     history_block = "\n".join(history[-5:]) if history else "None"
@@ -174,7 +175,7 @@ def build_user_prompt(
         f"""
         Step: {step}
         Observation:
-        {result.observation.model_dump_json()}
+        {observation.model_dump_json()}
 
         Previous steps:
         {history_block}
@@ -204,16 +205,16 @@ def parse_action_response(raw_text: str) -> LLMActionResponse:
 
 def choose_action(
     client: OpenAI | None,
-    result: CampusMarketStepResult,
+    observation: CampusMarketObservation,
     step: int,
     history: list[str],
 ) -> tuple[CampusMarketAction, Optional[str]]:
     """Query the model for an action, or fall back to a safe heuristic."""
 
     if client is None:
-        return safe_default_action(result.observation), "missing HF_TOKEN/API_KEY"
+        return safe_default_action(observation), "missing HF_TOKEN/API_KEY"
 
-    prompt = build_user_prompt(step=step, result=result, history=history)
+    prompt = build_user_prompt(step=step, observation=observation, history=history)
     try:
         completion = client.chat.completions.create(
             model=MODEL_NAME,
@@ -234,17 +235,26 @@ def choose_action(
         )
         return action, None
     except (ValidationError, ValueError, TypeError, KeyError, IndexError, AttributeError) as exc:
-        return safe_default_action(result.observation), str(exc)
+        return safe_default_action(observation), str(exc)
     except Exception as exc:
-        return safe_default_action(result.observation), str(exc)
+        return safe_default_action(observation), str(exc)
 
 
 def action_to_log_string(action: CampusMarketAction) -> str:
     return action.model_dump_json()
 
 
-def main() -> None:
+async def create_env() -> CampusMarketEnvClient:
+    if LOCAL_IMAGE_NAME:
+        return await CampusMarketEnvClient.from_docker_image(LOCAL_IMAGE_NAME)
+
     env = CampusMarketEnvClient(base_url=ENV_BASE_URL)
+    await env.connect()
+    return env
+
+
+async def main() -> None:
+    env = await create_env()
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY) if API_KEY else None
 
     history: list[str] = []
@@ -256,7 +266,8 @@ def main() -> None:
     log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        result = env.reset()
+        result = await env.reset()
+        observation = result.observation
 
         for step in range(1, MAX_STEPS + 1):
             if result.done:
@@ -264,7 +275,7 @@ def main() -> None:
 
             action, action_error = choose_action(
                 client=client,
-                result=result,
+                observation=observation,
                 step=step,
                 history=history,
             )
@@ -274,12 +285,11 @@ def main() -> None:
             step_error: Optional[str] = None
 
             try:
-                result = env.step(action)
+                result = await env.step(action)
                 reward = float(result.reward or 0.0)
                 done = bool(result.done)
                 observation = result.observation
             except Exception as exc:
-                observation = result.observation
                 step_error = str(exc) if action_error is None else f"{action_error}; {exc}"
 
             rewards.append(reward)
@@ -313,8 +323,9 @@ def main() -> None:
         score = max(0.0, min(sum(rewards) / MAX_TOTAL_REWARD, 1.0))
         success = score >= SUCCESS_SCORE_THRESHOLD
     finally:
+        await env.close()
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 if __name__ == "__main__":
-    main()
+    asyncio.run(main())

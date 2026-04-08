@@ -6,20 +6,23 @@ app_port: 7860
 
 # Campus Market Environment
 
-`campus_market_env` is a single-container reinforcement learning environment service for a campus shop simulation.
+`campus_market_env` is an OpenEnv-compatible reinforcement learning environment for a campus shop simulation.
 
-It runs as a FastAPI app with:
+It now follows the real OpenEnv SDK pattern:
 
-- a root landing page at `/`
-- interactive docs at `/docs`
-- environment endpoints under `/api`
+- `CampusMarketEnvClient` is an `openenv.core.EnvClient`
+- the server is created with `openenv.core.env_server.create_app(...)`
+- clients connect over the standard OpenEnv WebSocket session endpoint
+- inference can use `from_docker_image(...)` with the local Docker image
 
-## API
+## OpenEnv Endpoints
 
-- `GET /api/health`
-- `POST /api/reset`
-- `POST /api/step`
-- `GET /api/state`
+- `GET /health`
+- `POST /reset`
+- `POST /step`
+- `GET /state`
+- `GET /schema`
+- `WS /ws`
 
 ## Project Layout
 
@@ -60,13 +63,12 @@ docker run -p 7860:7860 campus-market
 
 Then open:
 
-- `http://localhost:7860/`
 - `http://localhost:7860/docs`
 
 Health check:
 
 ```bash
-curl http://localhost:7860/api/health
+curl http://localhost:7860/health
 ```
 
 ## Hugging Face Spaces
@@ -79,12 +81,40 @@ This repository is configured for a Docker Space:
 
 Push this repository to a Hugging Face Docker Space and the container should start without needing a separate frontend build step.
 
-## Example Requests
+## OpenEnv Client Usage
+
+```python
+import asyncio
+
+from campus_market_env import CampusMarketAction, CampusMarketEnvClient
+
+
+async def run() -> None:
+    env = await CampusMarketEnvClient.from_docker_image("campus-market:latest")
+    try:
+        result = await env.reset(seed=7)
+        result = await env.step(
+            CampusMarketAction(
+                price_adjustment=0.1,
+                marketing_spend=100.0,
+                restock_amount=10,
+                product_focus="food",
+            )
+        )
+        print(result.reward, result.done)
+    finally:
+        await env.close()
+
+
+asyncio.run(run())
+```
+
+## Raw HTTP Examples
 
 Reset:
 
 ```bash
-curl -X POST http://localhost:7860/api/reset \
+curl -X POST http://localhost:7860/reset \
   -H "Content-Type: application/json" \
   -d '{"seed": 7}'
 ```
@@ -92,12 +122,14 @@ curl -X POST http://localhost:7860/api/reset \
 Step:
 
 ```bash
-curl -X POST http://localhost:7860/api/step \
+curl -X POST http://localhost:7860/step \
   -H "Content-Type: application/json" \
   -d '{
-    "price_adjustment": 0.1,
-    "marketing_spend": 100.0,
-    "restock_amount": 10,
-    "product_focus": "food"
+    "action": {
+      "price_adjustment": 0.1,
+      "marketing_spend": 100.0,
+      "restock_amount": 10,
+      "product_focus": "food"
+    }
   }'
 ```

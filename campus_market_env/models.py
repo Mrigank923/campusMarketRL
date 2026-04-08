@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TypeAlias
 
+from openenv.core.env_server.types import Action, Observation, State
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 from campus_market_env.enums import PhaseEnum, ShopTypeEnum
@@ -15,7 +16,7 @@ def _enum_values(enum_type: type[PhaseEnum] | type[ShopTypeEnum]) -> set[str]:
     return {member.value for member in enum_type}
 
 
-class CampusMarketAction(BaseModel):
+class CampusMarketAction(Action):
     """Agent action for the campus market simulation."""
 
     model_config = ConfigDict(extra="forbid")
@@ -35,7 +36,7 @@ class CampusMarketAction(BaseModel):
         return value
 
 
-class CampusMarketObservation(BaseModel):
+class CampusMarketObservation(Observation):
     """Environment observation returned to the agent."""
 
     model_config = ConfigDict(extra="forbid")
@@ -74,15 +75,16 @@ class CampusMarketObservation(BaseModel):
         return self
 
 
-class CampusMarketState(BaseModel):
+class CampusMarketState(State):
     """Minimal environment state exposed through the OpenEnv interface."""
 
     model_config = ConfigDict(extra="forbid")
 
     episode_id: str = Field(min_length=1)
+    step_count: int = Field(default=0, ge=0)
     current_day: int = Field(ge=1)
     current_phase: str
-    total_steps: int = Field(ge=0)
+    total_steps: int = Field(default=0, ge=0)
     done: bool
     last_7_days_revenue: list[float] = Field(default_factory=list)
     last_7_days_satisfaction: list[float] = Field(default_factory=list)
@@ -99,8 +101,18 @@ class CampusMarketState(BaseModel):
             )
         return value
 
+    @model_validator(mode="after")
+    def sync_step_counts(self) -> "CampusMarketState":
+        if self.total_steps == 0 and self.step_count != 0:
+            self.total_steps = self.step_count
+        elif self.step_count == 0 and self.total_steps != 0:
+            self.step_count = self.total_steps
+        elif self.step_count != self.total_steps:
+            raise ValueError("step_count must match total_steps.")
+        return self
 
-class CampusMarketSessionState(BaseModel):
+
+class CampusMarketSessionState(State):
     """Process-local session state for the running environment server."""
 
     model_config = ConfigDict(extra="forbid")
