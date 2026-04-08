@@ -6,7 +6,7 @@ import random
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from campus_market_env.config import (
+from ..config import (
     HIGH_BUDGET_RANGE,
     HIGH_CLUSTER_SIZE_RANGE,
     HOLIDAY_MAX_STUDENT_CLUSTERS,
@@ -17,7 +17,7 @@ from campus_market_env.config import (
     MID_CLUSTER_SIZE_RANGE,
     MIN_STUDENT_CLUSTERS,
 )
-from campus_market_env.enums import ShopTypeEnum, TrendTypeEnum
+from ..enums import ShopTypeEnum, TrendTypeEnum
 
 
 class StudentCluster(BaseModel):

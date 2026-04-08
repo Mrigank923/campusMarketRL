@@ -1,20 +1,20 @@
 """Campus Market RL environment package."""
 
-from campus_market_env.client import CampusMarketEnvClient
-from campus_market_env.config import (
+from .client import CampusMarketEnvClient
+from .config import (
     DEFAULT_BUDGET,
     INVENTORY_THRESHOLD,
     MAX_DAYS_PER_EPISODE,
     PHASES_PER_DAY,
 )
-from campus_market_env.models import (
+from .models import (
     CampusMarketAction,
     CampusMarketObservation,
     CampusMarketSessionState,
     CampusMarketState,
     CampusMarketStepResult,
 )
-from campus_market_env.server.environment import CampusMarketEnv
+from .server.environment import CampusMarketEnv
 
 __all__ = [
     "CampusMarketAction",

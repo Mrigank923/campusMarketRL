@@ -17,11 +17,23 @@ dependencies = [
   "uvicorn>=0.30,<1.0",
 ]
 
+
+[project.optional-dependencies]
+gym = [
+  "gymnasium>=0.29,<1.0",
+]
+
+[project.scripts]
+server = "campus_market_env.server.app:main"
+
+[tool.setuptools.package-dir]
+campus_market_env = "."
+"campus_market_env.server" = "server"
+
 [tool.setuptools]
+packages = ["campus_market_env", "campus_market_env.server"]
 include-package-data = true
 
-[tool.setuptools.packages.find]
-include = ["campus_market_env*"]
-
 [tool.setuptools.package-data]
-campus_market_env = ["openenv.yaml", "server/Dockerfile", "server/requirements.txt"]
+campus_market_env = ["openenv.yaml"]
+"campus_market_env.server" = ["Dockerfile", "requirements.txt"]

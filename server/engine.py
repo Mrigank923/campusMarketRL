@@ -7,7 +7,7 @@ from statistics import fmean
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from campus_market_env.config import (
+from ..config import (
     AUTO_RESTOCK_TARGET_LEVEL,
     AUTO_RESTOCK_UNIT_COST,
     ACTIVE_TRAFFIC_MULTIPLIER,
@@ -41,19 +41,19 @@ from campus_market_env.config import (
     STOCKOUT_REWARD_PENALTY,
     SUPPLY_SHORTAGE_INVENTORY_DELTA,
 )
-from campus_market_env.models import (
+from ..models import (
     CampusMarketAction,
     CampusMarketObservation,
     CampusMarketState,
 )
-from campus_market_env.server.competitor_model import (
+from .competitor_model import (
     CompetitorConfig,
     compute_competitor_pressure as calculate_competitor_pressure,
     generate_competitors,
 )
-from campus_market_env.server.student_model import StudentCluster, generate_student_clusters
-from campus_market_env.server.trend_model import get_trend, get_trend_multiplier
-from campus_market_env.enums import PhaseEnum, ShopTypeEnum, TrendTypeEnum
+from .student_model import StudentCluster, generate_student_clusters
+from .trend_model import get_trend, get_trend_multiplier
+from ..enums import PhaseEnum, ShopTypeEnum, TrendTypeEnum
 
 InfoValue = str | int | float | bool
 

@@ -9,14 +9,14 @@ from uuid import uuid4
 from openenv.core.env_server.interfaces import Environment
 from openenv.core.env_server.types import EnvironmentMetadata
 
-from campus_market_env.models import (
+from ..models import (
     CampusMarketAction,
     CampusMarketObservation,
     CampusMarketSessionState,
     CampusMarketState,
 )
-from campus_market_env.server.engine import build_initial_observation, compute_step
-from campus_market_env.server.state_manager import create_initial_state, transition_after_step
+from .engine import build_initial_observation, compute_step
+from .state_manager import create_initial_state, transition_after_step
 
 InfoValue = str | int | float | bool
 InfoDict = dict[str, InfoValue]

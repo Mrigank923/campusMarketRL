@@ -6,13 +6,13 @@ import random
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from campus_market_env.config import (
+from ..config import (
     COMPETITOR_COUNT,
     COMPETITOR_INVENTORY_RANGE,
     COMPETITOR_MARKETING_RANGE,
     COMPETITOR_PRICING_RANGE,
 )
-from campus_market_env.enums import ShopTypeEnum
+from ..enums import ShopTypeEnum
 
 
 class CompetitorShop(BaseModel):

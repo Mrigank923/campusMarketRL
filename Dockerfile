@@ -8,11 +8,19 @@ ENV PYTHONUNBUFFERED=1 \
 COPY requirements.txt .
 COPY pyproject.toml .
 COPY README.md .
+COPY __init__.py .
+COPY client.py .
+COPY config.py .
+COPY enums.py .
+COPY gym_env.py .
+COPY models.py .
+COPY openenv.yaml .
+COPY server ./server
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY campus_market_env ./campus_market_env
 COPY docs ./docs
 COPY static ./static
+COPY tasks ./tasks
 COPY run_agent.py .
 COPY test_env.py .
 COPY inference.py .

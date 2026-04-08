@@ -7,7 +7,7 @@ from typing import TypeAlias
 from openenv.core.env_server.types import Action, Observation, State
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
-from campus_market_env.enums import PhaseEnum, ShopTypeEnum
+from .enums import PhaseEnum, ShopTypeEnum
 
 InfoValue: TypeAlias = str | int | float | bool
 

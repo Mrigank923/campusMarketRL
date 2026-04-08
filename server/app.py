@@ -8,8 +8,8 @@ import os
 import uvicorn
 from openenv.core.env_server.http_server import create_app
 
-from campus_market_env.models import CampusMarketAction, CampusMarketObservation
-from campus_market_env.server.environment import CampusMarketEnv
+from ..models import CampusMarketAction, CampusMarketObservation
+from .environment import CampusMarketEnv
 
 app = create_app(
     CampusMarketEnv,

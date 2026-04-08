@@ -10,11 +10,11 @@
 #   - curl (usually pre-installed)
 #
 # Run:
-#   curl -fsSL https://raw.githubusercontent.com/Mrigank923/campusMarketRL/main/validate-submission.sh | bash -s -- https://mrigank923-campusmarketenv.hf.space/ [campus_market_env/]
+#   curl -fsSL https://raw.githubusercontent.com/<owner>/<repo>/main/scripts/validate-submission.sh | bash -s -- <ping_url> [repo_dir]
 #
 #   Or download and run locally:
 #     chmod +x validate-submission.sh
-#     ./validate-submission.sh https://mrigank923-campusmarketenv.hf.space/ [campus_market_env/]
+#     ./validate-submission.sh <ping_url> [repo_dir]
 #
 # Arguments:
 #   ping_url   Your HuggingFace Space URL (e.g. https://your-space.hf.space)
@@ -68,7 +68,6 @@ trap cleanup EXIT
 
 PING_URL="${1:-}"
 REPO_DIR="${2:-.}"
-ENV_DIR=""
 
 if [ -z "$PING_URL" ]; then
   printf "Usage: %s <ping_url> [repo_dir]\n" "$0"
@@ -82,16 +81,6 @@ if ! REPO_DIR="$(cd "$REPO_DIR" 2>/dev/null && pwd)"; then
   printf "Error: directory '%s' not found\n" "${2:-.}"
   exit 1
 fi
-
-if [ -f "$REPO_DIR/openenv.yaml" ]; then
-  ENV_DIR="$REPO_DIR"
-elif [ -f "$REPO_DIR/campus_market_env/openenv.yaml" ]; then
-  ENV_DIR="$REPO_DIR/campus_market_env"
-else
-  printf "Error: could not find openenv.yaml in '%s' or '%s/campus_market_env'\n" "$REPO_DIR" "$REPO_DIR"
-  exit 1
-fi
-
 PING_URL="${PING_URL%/}"
 export PING_URL
 PASS=0
@@ -111,7 +100,6 @@ printf "${BOLD}========================================${NC}\n"
 printf "${BOLD}  OpenEnv Submission Validator${NC}\n"
 printf "${BOLD}========================================${NC}\n"
 log "Repo:     $REPO_DIR"
-log "Env Dir:  $ENV_DIR"
 log "Ping URL: $PING_URL"
 printf "\n"
 
@@ -176,7 +164,7 @@ if ! command -v openenv &>/dev/null; then
 fi
 
 VALIDATE_OK=false
-VALIDATE_OUTPUT=$(cd "$ENV_DIR" && openenv validate 2>&1) && VALIDATE_OK=true
+VALIDATE_OUTPUT=$(cd "$REPO_DIR" && openenv validate 2>&1) && VALIDATE_OK=true
 
 if [ "$VALIDATE_OK" = true ]; then
   pass "openenv validate passed"
