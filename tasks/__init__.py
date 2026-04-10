@@ -33,17 +33,13 @@ def ensure_source_package() -> None:
 ensure_source_package()
 
 # Task registry: List all available graders as strings for platform validators
-# The platform checks for at least 3 graders during validation
+# The platform checks for task graders during validation
 GRADERS = [
-    "grade_easy",
-    "grade_medium",
-    "grade_hard",
+    "grade_action",
 ]
 
 __all__ = [
-    "task_easy",
-    "task_medium",
-    "task_hard",
+    "definitions",
+    "graders",
     "GRADERS",
-    "ensure_source_package",
 ]

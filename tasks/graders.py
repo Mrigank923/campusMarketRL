@@ -1,185 +1,204 @@
-from __future__ import annotations
+# tasks/graders.py
+# Campus Market task graders with normalized criterion-based scoring.
 
-import sys
-import time
 from dataclasses import dataclass, field
-from io import StringIO
-from pathlib import Path
-
-_project_root = str(Path(__file__).resolve().parent.parent)
-if _project_root not in sys.path:
-    sys.path.insert(0, _project_root)
-
-from structured_stdout import emit_end, emit_start, emit_step
-from tasks import easy, medium, hard
-
-
-def clamp01(value: float) -> float:
-    return max(0.0, min(1.0, value))
-
-
-
-def _score_at_least(actual: float, target: float) -> float:
-    if target <= 0:
-        return 1.0
-    return clamp01(actual / target)
-
-
-def _score_at_most(actual: float, limit: float) -> float:
-    if limit <= 0:
-        return 0.0 if actual > 0 else 1.0
-    return clamp01(1.0 - (actual / limit))
+from statistics import mean
+from typing import Optional
 
 
 @dataclass
-class CriterionResult:
+class CriterionScore:
+    """Individual criterion evaluation."""
     name: str
     actual: float
     target: float
-    direction: str  
+    direction: str  # "at_least" or "at_most"
     score: float = 0.0
 
 
 @dataclass
 class TaskGrade:
+    """Complete task evaluation result."""
     task_name: str
     difficulty: str
-    criteria: list[CriterionResult] = field(default_factory=list)
+    criteria: list[CriterionScore] = field(default_factory=list)
     grade: float = 0.0
-    elapsed_seconds: float = 0.0
 
 
-def grade_easy(result: easy.TaskResult) -> TaskGrade:
+def clamp(value: float, lower: float, upper: float) -> float:
+    """Clamp value to [lower, upper]."""
+    return max(lower, min(upper, value))
+
+
+def score_at_least(actual: float, target: float) -> float:
+    """Score for 'at least' criteria: 0 if below target, 1 if at target, scaled in between."""
+    if target <= 0:
+        return 1.0
+    return clamp(actual / target, 0.0, 1.0)
+
+
+def score_at_most(actual: float, limit: float) -> float:
+    """Score for 'at most' criteria: 0 if above limit, 1 if below limit."""
+    if limit <= 0:
+        return 0.0 if actual > 0 else 1.0
+    return clamp(1.0 - (actual / limit), 0.0, 1.0)
+
+
+def grade_easy(
+    cumulative_revenue: float,
+    avg_satisfaction: float,
+    stockout_fraction: float,
+) -> TaskGrade:
+    """Grade easy task: 30-day steady state."""
     criteria = [
-        CriterionResult(
+        CriterionScore(
             "cumulative_revenue",
-            result.cumulative_revenue,
-            easy.REVENUE_TARGET,
+            cumulative_revenue,
+            75000.0,
             "at_least",
         ),
-        CriterionResult(
+        CriterionScore(
             "avg_satisfaction",
-            result.avg_satisfaction,
-            easy.MIN_AVG_SATISFACTION,
+            avg_satisfaction,
+            0.55,
             "at_least",
         ),
-        CriterionResult(
+        CriterionScore(
             "stockout_fraction",
-            result.stockout_fraction,
-            easy.MAX_STOCKOUT_FRACTION,
+            stockout_fraction,
+            0.10,
             "at_most",
         ),
     ]
+    
     for c in criteria:
         c.score = (
-            _score_at_least(c.actual, c.target)
+            score_at_least(c.actual, c.target)
             if c.direction == "at_least"
-            else _score_at_most(c.actual, c.target)
+            else score_at_most(c.actual, c.target)
         )
-    grade = sum(c.score for c in criteria) / len(criteria)
+    
+    grade = mean(c.score for c in criteria) if criteria else 0.0
     return TaskGrade(
-        task_name=result.task_name,
+        task_name="easy_steady_state",
         difficulty="easy",
         criteria=criteria,
         grade=round(grade, 4),
     )
 
 
-def grade_medium(result: medium.TaskResult) -> TaskGrade:
+def grade_medium(
+    cumulative_revenue: float,
+    avg_satisfaction: float,
+    stockout_fraction: float,
+    avg_reward: float,
+) -> TaskGrade:
+    """Grade medium task: 60-day adaptive pricing."""
     criteria = [
-        CriterionResult(
+        CriterionScore(
             "cumulative_revenue",
-            result.cumulative_revenue,
-            medium.REVENUE_TARGET,
+            cumulative_revenue,
+            180000.0,
             "at_least",
         ),
-        CriterionResult(
+        CriterionScore(
             "avg_satisfaction",
-            result.avg_satisfaction,
-            medium.MIN_AVG_SATISFACTION,
+            avg_satisfaction,
+            0.58,
             "at_least",
         ),
-        CriterionResult(
+        CriterionScore(
             "stockout_fraction",
-            result.stockout_fraction,
-            medium.MAX_STOCKOUT_FRACTION,
+            stockout_fraction,
+            0.08,
             "at_most",
         ),
-        CriterionResult(
+        CriterionScore(
             "avg_reward",
-            result.avg_reward,
-            medium.MIN_AVG_REWARD,
+            avg_reward,
+            3.5,
             "at_least",
         ),
     ]
+    
     for c in criteria:
         c.score = (
-            _score_at_least(c.actual, c.target)
+            score_at_least(c.actual, c.target)
             if c.direction == "at_least"
-            else _score_at_most(c.actual, c.target)
+            else score_at_most(c.actual, c.target)
         )
-    grade = sum(c.score for c in criteria) / len(criteria)
+    
+    grade = mean(c.score for c in criteria) if criteria else 0.0
     return TaskGrade(
-        task_name=result.task_name,
+        task_name="medium_adaptive_pricing",
         difficulty="medium",
         criteria=criteria,
         grade=round(grade, 4),
     )
 
 
-def grade_hard(result: hard.TaskResult) -> TaskGrade:
+def grade_hard(
+    cumulative_revenue: float,
+    avg_satisfaction: float,
+    stockout_fraction: float,
+    avg_reward: float,
+    final_budget: float,
+    final_awareness: float,
+) -> TaskGrade:
+    """Grade hard task: 90-day full-horizon management."""
     criteria = [
-        CriterionResult(
+        CriterionScore(
             "cumulative_revenue",
-            result.cumulative_revenue,
-            hard.REVENUE_TARGET,
+            cumulative_revenue,
+            400000.0,
             "at_least",
         ),
-        CriterionResult(
+        CriterionScore(
             "avg_satisfaction",
-            result.avg_satisfaction,
-            hard.MIN_AVG_SATISFACTION,
+            avg_satisfaction,
+            0.60,
             "at_least",
         ),
-        CriterionResult(
+        CriterionScore(
             "stockout_fraction",
-            result.stockout_fraction,
-            hard.MAX_STOCKOUT_FRACTION,
+            stockout_fraction,
+            0.06,
             "at_most",
         ),
-        CriterionResult(
+        CriterionScore(
             "avg_reward",
-            result.avg_reward,
-            hard.MIN_AVG_REWARD,
+            avg_reward,
+            4.0,
             "at_least",
         ),
-        CriterionResult(
+        CriterionScore(
             "final_budget",
-            result.final_budget,
-            hard.MIN_FINAL_BUDGET,
+            final_budget,
+            2000.0,
             "at_least",
         ),
-        CriterionResult(
+        CriterionScore(
             "final_awareness",
-            result.final_awareness,
-            hard.MIN_FINAL_AWARENESS,
+            final_awareness,
+            0.65,
             "at_least",
         ),
     ]
+    
     for c in criteria:
         c.score = (
-            _score_at_least(c.actual, c.target)
+            score_at_least(c.actual, c.target)
             if c.direction == "at_least"
-            else _score_at_most(c.actual, c.target)
+            else score_at_most(c.actual, c.target)
         )
-    grade = sum(c.score for c in criteria) / len(criteria)
+    
+    grade = mean(c.score for c in criteria) if criteria else 0.0
     return TaskGrade(
-        task_name=result.task_name,
+        task_name="hard_full_horizon",
         difficulty="hard",
         criteria=criteria,
         grade=round(grade, 4),
     )
-
 
 
 DIFFICULTY_WEIGHTS = {
@@ -190,95 +209,69 @@ DIFFICULTY_WEIGHTS = {
 
 
 def compute_overall_grade(task_grades: list[TaskGrade]) -> float:
-    """Weighted average of task grades."""
+    """Compute weighted average of task grades."""
     if not task_grades:
         return 0.0
+    
     weighted_sum = 0.0
     weight_sum = 0.0
     for tg in task_grades:
         w = DIFFICULTY_WEIGHTS.get(tg.difficulty, 0.0)
         weighted_sum += tg.grade * w
         weight_sum += w
+    
     return round(weighted_sum / weight_sum, 4) if weight_sum > 0 else 0.0
 
 
-def _separator(char: str = "─", width: int = 72) -> str:
-    return char * width
-
-
-def format_report(
-    task_grades: list[TaskGrade],
-    overall_grade: float,
-) -> str:
-    buf = StringIO()
-
-    buf.write("\n")
-    buf.write(_separator("═") + "\n")
-    buf.write("  CAMPUS MARKET ENVIRONMENT — GRADING REPORT\n")
-    buf.write(_separator("═") + "\n\n")
-
-    for tg in task_grades:
-        buf.write(f"  Task: {tg.task_name}  [{tg.difficulty.upper()}]\n")
-        buf.write(f"  Time: {tg.elapsed_seconds:.2f}s\n")
-        buf.write(_separator() + "\n")
-
-        header = f"  {'Criterion':<25} {'Actual':>12} {'Target':>12} {'Dir':>9} {'Score':>8}\n"
-        buf.write(header)
-        buf.write(_separator() + "\n")
-
-        for c in tg.criteria:
-            dir_label = "≥" if c.direction == "at_least" else "≤"
-            buf.write(
-                f"  {c.name:<25} {c.actual:>12.4f} {c.target:>12.4f} {dir_label:>9} {c.score:>8.4f}\n"
-            )
-        buf.write(_separator() + "\n")
-        buf.write(f"  Task Grade: {tg.grade:.4f}\n\n")
-
-    buf.write(_separator("═") + "\n")
-    buf.write(f"  OVERALL GRADE: {overall_grade:.4f}  (range 0.0 – 1.0)\n")
-    buf.write(_separator("═") + "\n\n")
-
-    weights_info = "  Weights: " + " · ".join(
-        f"{k} {int(v * 100)}%" for k, v in DIFFICULTY_WEIGHTS.items()
-    )
-    buf.write(weights_info + "\n\n")
-
-    return buf.getvalue()
-
-
 def main() -> None:
-    emit_start(script="tasks.grader")
-
-    task_grades: list[TaskGrade] = []
-
-    t0 = time.perf_counter()
-    easy_result = task_easy.run()
-    easy_grade = grade_easy(easy_result)
-    easy_grade.elapsed_seconds = round(time.perf_counter() - t0, 3)
-    task_grades.append(easy_grade)
-    emit_step(task=easy_grade.task_name, difficulty="easy", elapsed_seconds=easy_grade.elapsed_seconds, grade=easy_grade.grade)
-
-    t0 = time.perf_counter()
-    medium_result = task_medium.run()
-    medium_grade = grade_medium(medium_result)
-    medium_grade.elapsed_seconds = round(time.perf_counter() - t0, 3)
-    task_grades.append(medium_grade)
-    emit_step(task=medium_grade.task_name, difficulty="medium", elapsed_seconds=medium_grade.elapsed_seconds, grade=medium_grade.grade)
-
-    t0 = time.perf_counter()
-    hard_result = task_hard.run()
-    hard_grade = grade_hard(hard_result)
-    hard_grade.elapsed_seconds = round(time.perf_counter() - t0, 3)
-    task_grades.append(hard_grade)
-    emit_step(task=hard_grade.task_name, difficulty="hard", elapsed_seconds=hard_grade.elapsed_seconds, grade=hard_grade.grade)
-
-    overall = compute_overall_grade(task_grades)
-    report = format_report(task_grades, overall)
-
-    # Persist to file
-    report_path = Path(__file__).resolve().parent / "grading_report.txt"
-    report_path.write_text(report, encoding="utf-8")
-    emit_end(overall_grade=overall, report_path=str(report_path))
+    """Demo: show campus market grader in action."""
+    print("=" * 70)
+    print("CAMPUS MARKET GRADER — DEMO RUN")
+    print("=" * 70)
+    
+    # Example results from running tasks
+    print("\n📊 Easy Task (30 days):")
+    easy = grade_easy(
+        cumulative_revenue=72000.0,
+        avg_satisfaction=0.52,
+        stockout_fraction=0.12,
+    )
+    print(f"  Grade: {easy.grade:.4f}")
+    for c in easy.criteria:
+        direction = "≥" if c.direction == "at_least" else "≤"
+        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.4f}")
+    
+    print("\n📊 Medium Task (60 days):")
+    medium = grade_medium(
+        cumulative_revenue=185000.0,
+        avg_satisfaction=0.58,
+        stockout_fraction=0.07,
+        avg_reward=3.6,
+    )
+    print(f"  Grade: {medium.grade:.4f}")
+    for c in medium.criteria:
+        direction = "≥" if c.direction == "at_least" else "≤"
+        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.4f}")
+    
+    print("\n📊 Hard Task (90 days):")
+    hard = grade_hard(
+        cumulative_revenue=410000.0,
+        avg_satisfaction=0.61,
+        stockout_fraction=0.05,
+        avg_reward=4.2,
+        final_budget=2500.0,
+        final_awareness=0.67,
+    )
+    print(f"  Grade: {hard.grade:.4f}")
+    for c in hard.criteria:
+        direction = "≥" if c.direction == "at_least" else "≤"
+        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.4f}")
+    
+    overall = compute_overall_grade([easy, medium, hard])
+    print("\n" + "=" * 70)
+    print(f"OVERALL GRADE: {overall:.4f} (range 0.0 – 1.0)")
+    print(f"Weights: easy 20% | medium 30% | hard 50%")
+    print("=" * 70)
 
 
 if __name__ == "__main__":
