@@ -16,7 +16,6 @@ from campus_market_env.client import CampusMarketEnvClient
 from campus_market_env.config import MAX_DAYS_PER_EPISODE, PHASES_PER_DAY, REWARD_CLAMP_MAX
 from campus_market_env.enums import ShopTypeEnum
 from campus_market_env.models import CampusMarketAction, CampusMarketObservation
-from structured_stdout import emit_end, emit_start, emit_step
 
 
 class LLMActionResponse(BaseModel):
@@ -68,6 +67,7 @@ MAX_STEPS = int(os.getenv("MAX_STEPS", str(MAX_DAYS_PER_EPISODE * PHASES_PER_DAY
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "250"))
 SUCCESS_SCORE_THRESHOLD = float(os.getenv("SUCCESS_SCORE_THRESHOLD", "0.1"))
+DOCKER_CONTAINER_PORT = int(os.getenv("DOCKER_CONTAINER_PORT", "8000"))
 
 VALID_PRODUCT_FOCUS: Final[tuple[str, ...]] = tuple(shop.value for shop in ShopTypeEnum)
 MAX_TOTAL_REWARD: Final[float] = max(1.0, MAX_STEPS * REWARD_CLAMP_MAX)
@@ -93,19 +93,22 @@ SYSTEM_PROMPT = textwrap.dedent(
 
 
 def log_start(task: str, env: str, model: str) -> None:
-    emit_start(task=task, env=env, model=model)
+    print(f"[START] task={task} env={env} model={model}", flush=True)
 
 
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
-    emit_step(step=step, action=action, reward=round(reward, 2), done=done, error=error)
+    error_value = error if error else "null"
+    print(
+        f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error_value}",
+        flush=True,
+    )
 
 
 def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
-    emit_end(
-        success=success,
-        steps=steps,
-        score=round(score, 2),
-        rewards=[round(reward, 2) for reward in rewards],
+    rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
+    print(
+        f"[END] success={str(success).lower()} steps={steps} score={score:.2f} rewards={rewards_str}",
+        flush=True,
     )
 
 
@@ -235,7 +238,10 @@ def action_to_log_string(action: CampusMarketAction) -> str:
 
 async def create_env() -> CampusMarketEnvClient:
     if LOCAL_IMAGE_NAME:
-        return await CampusMarketEnvClient.from_docker_image(LOCAL_IMAGE_NAME)
+        return await CampusMarketEnvClient.from_docker_image(
+            LOCAL_IMAGE_NAME,
+            env_vars={"PORT": str(DOCKER_CONTAINER_PORT)},
+        )
 
     env = CampusMarketEnvClient(base_url=ENV_BASE_URL)
     await env.connect()
@@ -280,6 +286,9 @@ async def main() -> None:
                 observation = result.observation
             except Exception as exc:
                 step_error = str(exc) if action_error is None else f"{action_error}; {exc}"
+
+            if step_error is None and action_error is not None:
+                step_error = action_error
 
             rewards.append(reward)
             steps_taken = step
