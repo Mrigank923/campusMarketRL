@@ -11,7 +11,7 @@ if _project_root not in sys.path:
     sys.path.insert(0, _project_root)
 
 from structured_stdout import emit_end, emit_start, emit_step
-from tasks import task_easy, task_medium, task_hard
+from tasks import easy, medium, hard
 
 
 def clamp01(value: float) -> float:
@@ -49,24 +49,24 @@ class TaskGrade:
     elapsed_seconds: float = 0.0
 
 
-def grade_easy(result: task_easy.TaskResult) -> TaskGrade:
+def grade_easy(result: easy.TaskResult) -> TaskGrade:
     criteria = [
         CriterionResult(
             "cumulative_revenue",
             result.cumulative_revenue,
-            task_easy.REVENUE_TARGET,
+            easy.REVENUE_TARGET,
             "at_least",
         ),
         CriterionResult(
             "avg_satisfaction",
             result.avg_satisfaction,
-            task_easy.MIN_AVG_SATISFACTION,
+            easy.MIN_AVG_SATISFACTION,
             "at_least",
         ),
         CriterionResult(
             "stockout_fraction",
             result.stockout_fraction,
-            task_easy.MAX_STOCKOUT_FRACTION,
+            easy.MAX_STOCKOUT_FRACTION,
             "at_most",
         ),
     ]
@@ -85,30 +85,30 @@ def grade_easy(result: task_easy.TaskResult) -> TaskGrade:
     )
 
 
-def grade_medium(result: task_medium.TaskResult) -> TaskGrade:
+def grade_medium(result: medium.TaskResult) -> TaskGrade:
     criteria = [
         CriterionResult(
             "cumulative_revenue",
             result.cumulative_revenue,
-            task_medium.REVENUE_TARGET,
+            medium.REVENUE_TARGET,
             "at_least",
         ),
         CriterionResult(
             "avg_satisfaction",
             result.avg_satisfaction,
-            task_medium.MIN_AVG_SATISFACTION,
+            medium.MIN_AVG_SATISFACTION,
             "at_least",
         ),
         CriterionResult(
             "stockout_fraction",
             result.stockout_fraction,
-            task_medium.MAX_STOCKOUT_FRACTION,
+            medium.MAX_STOCKOUT_FRACTION,
             "at_most",
         ),
         CriterionResult(
             "avg_reward",
             result.avg_reward,
-            task_medium.MIN_AVG_REWARD,
+            medium.MIN_AVG_REWARD,
             "at_least",
         ),
     ]
@@ -127,42 +127,42 @@ def grade_medium(result: task_medium.TaskResult) -> TaskGrade:
     )
 
 
-def grade_hard(result: task_hard.TaskResult) -> TaskGrade:
+def grade_hard(result: hard.TaskResult) -> TaskGrade:
     criteria = [
         CriterionResult(
             "cumulative_revenue",
             result.cumulative_revenue,
-            task_hard.REVENUE_TARGET,
+            hard.REVENUE_TARGET,
             "at_least",
         ),
         CriterionResult(
             "avg_satisfaction",
             result.avg_satisfaction,
-            task_hard.MIN_AVG_SATISFACTION,
+            hard.MIN_AVG_SATISFACTION,
             "at_least",
         ),
         CriterionResult(
             "stockout_fraction",
             result.stockout_fraction,
-            task_hard.MAX_STOCKOUT_FRACTION,
+            hard.MAX_STOCKOUT_FRACTION,
             "at_most",
         ),
         CriterionResult(
             "avg_reward",
             result.avg_reward,
-            task_hard.MIN_AVG_REWARD,
+            hard.MIN_AVG_REWARD,
             "at_least",
         ),
         CriterionResult(
             "final_budget",
             result.final_budget,
-            task_hard.MIN_FINAL_BUDGET,
+            hard.MIN_FINAL_BUDGET,
             "at_least",
         ),
         CriterionResult(
             "final_awareness",
             result.final_awareness,
-            task_hard.MIN_FINAL_AWARENESS,
+            hard.MIN_FINAL_AWARENESS,
             "at_least",
         ),
     ]
