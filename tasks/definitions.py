@@ -5,7 +5,7 @@ TASKS = {
     "easy_steady_state": {
         "description": "Maintain steady-state revenue and satisfaction over 30 days",
         "expected_metric": "revenue",
-        "steps": 90,  # 30 days * 3 phases
+        "steps": 30,  # 10 days * 3 phases
         "criteria": {
             "cumulative_revenue": 75000.0,
             "avg_satisfaction": 0.55,
@@ -16,7 +16,7 @@ TASKS = {
     "medium_adaptive_pricing": {
         "description": "Adapt pricing to seasonal trends and competitor pressure over 60 days",
         "expected_metric": "revenue + adaptation",
-        "steps": 180,  # 60 days * 3 phases
+        "steps": 60,  # 20 days * 3 phases
         "criteria": {
             "cumulative_revenue": 180000.0,
             "avg_satisfaction": 0.58,
@@ -28,7 +28,7 @@ TASKS = {
     "hard_full_horizon": {
         "description": "Manage full 90-day episode with budget and awareness constraints",
         "expected_metric": "holistic performance",
-        "steps": 270,  # 90 days * 3 phases
+        "steps": 90,  # 30 days * 3 phases
         "criteria": {
             "cumulative_revenue": 400000.0,
             "avg_satisfaction": 0.60,

@@ -332,7 +332,9 @@ async def run_task(client: OpenAI | None, task_name: str, env: CampusMarketEnvCl
             if step_error is not None or done:
                 break
 
-        score = max(0.0, min(sum(rewards) / max(1.0, max_steps * 10), 1.0))
+        # Calculate score strictly between 0 and 1 (not inclusive)
+        raw_score = sum(rewards) / max(1.0, max_steps * 10)
+        score = max(0.001, min(raw_score, 0.999))  # Clamp to (0.001, 0.999)
         success = score >= SUCCESS_SCORE_THRESHOLD
     except Exception as exc:
         log_step(step=steps_taken + 1, action="error", reward=0.0, done=True, error=str(exc))

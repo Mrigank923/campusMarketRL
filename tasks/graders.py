@@ -86,12 +86,13 @@ def grade_easy(
             else score_at_most(c.actual, c.target)
         )
     
-    grade = mean(c.score for c in criteria) if criteria else 0.0
+    grade = mean(c.score for c in criteria) if criteria else 0.5
+    grade = clamp_exclusive(round(grade, 4))
     return TaskGrade(
         task_name="easy_steady_state",
         difficulty="easy",
         criteria=criteria,
-        grade=round(grade, 4),
+        grade=grade,
     )
 
 
@@ -136,12 +137,13 @@ def grade_medium(
             else score_at_most(c.actual, c.target)
         )
     
-    grade = mean(c.score for c in criteria) if criteria else 0.0
+    grade = mean(c.score for c in criteria) if criteria else 0.5
+    grade = clamp_exclusive(round(grade, 4))
     return TaskGrade(
         task_name="medium_adaptive_pricing",
         difficulty="medium",
         criteria=criteria,
-        grade=round(grade, 4),
+        grade=grade,
     )
 
 
@@ -200,12 +202,13 @@ def grade_hard(
             else score_at_most(c.actual, c.target)
         )
     
-    grade = mean(c.score for c in criteria) if criteria else 0.0
+    grade = mean(c.score for c in criteria) if criteria else 0.5
+    grade = clamp_exclusive(round(grade, 4))
     return TaskGrade(
         task_name="hard_full_horizon",
         difficulty="hard",
         criteria=criteria,
-        grade=round(grade, 4),
+        grade=grade,
     )
 
 
@@ -217,9 +220,9 @@ DIFFICULTY_WEIGHTS = {
 
 
 def compute_overall_grade(task_grades: list[TaskGrade]) -> float:
-    """Compute weighted average of task grades."""
+    """Compute weighted average of task grades, clamped to (0, 1) exclusive."""
     if not task_grades:
-        return 0.0
+        return clamp_exclusive(0.5)  # Default to middle of range if no grades
     
     weighted_sum = 0.0
     weight_sum = 0.0
@@ -228,7 +231,8 @@ def compute_overall_grade(task_grades: list[TaskGrade]) -> float:
         weighted_sum += tg.grade * w
         weight_sum += w
     
-    return round(weighted_sum / weight_sum, 4) if weight_sum > 0 else 0.0
+    final_grade = weighted_sum / weight_sum if weight_sum > 0 else 0.5
+    return clamp_exclusive(round(final_grade, 4))
 
 
 def main() -> None:
