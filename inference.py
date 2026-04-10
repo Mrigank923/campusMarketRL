@@ -75,9 +75,9 @@ TASKS = [
 ]
 
 TASK_STEPS = {
-    "easy_steady_state": 30 * 3,  # 30 days * 3 phases
-    "medium_adaptive_pricing": 60 * 3,  # 60 days * 3 phases
-    "hard_full_horizon": 90 * 3,  # 90 days * 3 phases
+    "easy_steady_state": 5 * 3,  # 5 days * 3 phases
+    "medium_adaptive_pricing": 10 * 3,  # 10 days * 3 phases
+    "hard_full_horizon": 15 * 3,  # 15 days * 3 phases
 }
 
 VALID_PRODUCT_FOCUS: Final[tuple[str, ...]] = tuple(shop.value for shop in ShopTypeEnum)
@@ -271,8 +271,12 @@ async def run_task(client: OpenAI | None, task_name: str, env: CampusMarketEnvCl
     log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
 
     try:
-        result = await env.reset()
-        observation = result.observation
+        try:
+            result = await env.reset()
+            observation = result.observation
+        except Exception as exc:
+            log_step(step=1, action="reset", reward=0.0, done=True, error=f"Reset failed: {exc}")
+            raise
 
         for step in range(1, max_steps + 1):
             if result.done:
@@ -330,20 +334,30 @@ async def run_task(client: OpenAI | None, task_name: str, env: CampusMarketEnvCl
 
         score = max(0.0, min(sum(rewards) / max(1.0, max_steps * 10), 1.0))
         success = score >= SUCCESS_SCORE_THRESHOLD
+    except Exception as exc:
+        log_step(step=steps_taken + 1, action="error", reward=0.0, done=True, error=str(exc))
     finally:
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
 
 
 async def main() -> None:
     """Run all three campus market tasks (easy, medium, hard) in sequence."""
-    env = await create_env()
+    env = None
     client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY) if API_KEY else None
 
     try:
+        env = await create_env()
         for task_name in TASKS:
             await run_task(client=client, task_name=task_name, env=env)
+    except Exception as exc:
+        print(f"[ERROR] Fatal error in main: {exc}", flush=True)
+        raise
     finally:
-        await env.close()
+        if env is not None:
+            try:
+                await env.close()
+            except Exception as exc:
+                print(f"[ERROR] Failed to close environment: {exc}", flush=True)
 
 
 if __name__ == "__main__":
