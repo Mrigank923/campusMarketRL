@@ -30,18 +30,26 @@ def clamp(value: float, lower: float, upper: float) -> float:
     return max(lower, min(upper, value))
 
 
+def clamp_exclusive(value: float, epsilon: float = 0.001) -> float:
+    """Clamp value to strictly (epsilon, 1-epsilon) to avoid 0.0 and 1.0 boundaries."""
+    return clamp(value, epsilon, 1.0 - epsilon)
+
+
 def score_at_least(actual: float, target: float) -> float:
-    """Score for 'at least' criteria: 0 if below target, 1 if at target, scaled in between."""
+    """Score for 'at least' criteria: scaled ratio, bounded to (0, 1) exclusive."""
     if target <= 0:
-        return 1.0
-    return clamp(actual / target, 0.0, 1.0)
+        return clamp_exclusive(0.99)
+    score = clamp(actual / target, 0.0, 1.0)
+    return clamp_exclusive(score)
 
 
 def score_at_most(actual: float, limit: float) -> float:
-    """Score for 'at most' criteria: 0 if above limit, 1 if below limit."""
+    """Score for 'at most' criteria: penalize exceeding limit, bounded to (0, 1) exclusive."""
     if limit <= 0:
-        return 0.0 if actual > 0 else 1.0
-    return clamp(1.0 - (actual / limit), 0.0, 1.0)
+        score = 1.0 if actual <= 0 else 0.0
+    else:
+        score = clamp(1.0 - (actual / limit), 0.0, 1.0)
+    return clamp_exclusive(score)
 
 
 def grade_easy(
