@@ -61,16 +61,26 @@ MODEL_NAME = os.getenv("MODEL_NAME", "Qwen/Qwen2.5-72B-Instruct")
 
 # Environment-specific configuration.
 ENV_BASE_URL = os.getenv("CAMPUS_MARKET_ENV_BASE_URL", "http://localhost:7860")
-TASK_NAME = os.getenv("TASK_NAME", "campus_market_inference")
 BENCHMARK = os.getenv("BENCHMARK", "campus_market_env")
-MAX_STEPS = int(os.getenv("MAX_STEPS", str(MAX_DAYS_PER_EPISODE * PHASES_PER_DAY)))
 TEMPERATURE = float(os.getenv("TEMPERATURE", "0.2"))
 MAX_TOKENS = int(os.getenv("MAX_TOKENS", "250"))
 SUCCESS_SCORE_THRESHOLD = float(os.getenv("SUCCESS_SCORE_THRESHOLD", "0.1"))
 DOCKER_CONTAINER_PORT = int(os.getenv("DOCKER_CONTAINER_PORT", "8000"))
 
+# Task configuration — run all three difficulty levels
+TASKS = [
+    "easy_steady_state",
+    "medium_adaptive_pricing",
+    "hard_full_horizon",
+]
+
+TASK_STEPS = {
+    "easy_steady_state": 30 * 3,  # 30 days * 3 phases
+    "medium_adaptive_pricing": 60 * 3,  # 60 days * 3 phases
+    "hard_full_horizon": 90 * 3,  # 90 days * 3 phases
+}
+
 VALID_PRODUCT_FOCUS: Final[tuple[str, ...]] = tuple(shop.value for shop in ShopTypeEnum)
-MAX_TOTAL_REWARD: Final[float] = max(1.0, MAX_STEPS * REWARD_CLAMP_MAX)
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
@@ -248,23 +258,23 @@ async def create_env() -> CampusMarketEnvClient:
     return env
 
 
-async def main() -> None:
-    env = await create_env()
-    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY) if API_KEY else None
+async def run_task(client: OpenAI | None, task_name: str, env: CampusMarketEnvClient) -> None:
+    """Run a single task (easy, medium, or hard) and emit structured logs."""
 
+    max_steps = TASK_STEPS.get(task_name, 90)
     history: list[str] = []
     rewards: list[float] = []
     steps_taken = 0
     score = 0.0
     success = False
 
-    log_start(task=TASK_NAME, env=BENCHMARK, model=MODEL_NAME)
+    log_start(task=task_name, env=BENCHMARK, model=MODEL_NAME)
 
     try:
         result = await env.reset()
         observation = result.observation
 
-        for step in range(1, MAX_STEPS + 1):
+        for step in range(1, max_steps + 1):
             if result.done:
                 break
 
@@ -318,11 +328,22 @@ async def main() -> None:
             if step_error is not None or done:
                 break
 
-        score = max(0.0, min(sum(rewards) / MAX_TOTAL_REWARD, 1.0))
+        score = max(0.0, min(sum(rewards) / max(1.0, max_steps * 10), 1.0))
         success = score >= SUCCESS_SCORE_THRESHOLD
     finally:
-        await env.close()
         log_end(success=success, steps=steps_taken, score=score, rewards=rewards)
+
+
+async def main() -> None:
+    """Run all three campus market tasks (easy, medium, hard) in sequence."""
+    env = await create_env()
+    client = OpenAI(base_url=API_BASE_URL, api_key=API_KEY) if API_KEY else None
+
+    try:
+        for task_name in TASKS:
+            await run_task(client=client, task_name=task_name, env=env)
+    finally:
+        await env.close()
 
 
 if __name__ == "__main__":
