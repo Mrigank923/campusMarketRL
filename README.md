@@ -244,37 +244,42 @@ The Gymnasium wrapper projects this into an 11-feature fixed vector for standard
 
 ## Reward Function
 
-The reward is **profit-first**, but shaped to discourage brittle strategies such as overpricing, overstocking, or letting service quality collapse.
+The reward is **net-profit-first**, and the runtime now uses fulfilled sales plus budget-aware action execution. Marketing and restocking are clipped by the remaining monthly budget, manual restocking is charged explicitly, and revenue is credited only for realized sales.
 
 ```text
-R = profit_term
+R = net_profit_term
   + satisfaction_delta_term
+  + satisfaction_level_term
   - inventory_balance_penalty
   - overstock_penalty
   + inventory_progress_reward
   - controllable_stockout_penalty
-  - overpricing_penalty
+  - contextual_overpricing_penalty
+  - budget_shortfall_penalty
 ```
 
 ### Reward Components
 
 | Component | Description |
 |-----------|-------------|
-| `profit_term` | Normalized gross profit after marketing, manual restocking, and auto-restocking costs |
+| `net_profit_term` | Normalized realized profit after executed marketing, manual restocking, and auto-restocking costs |
 | `satisfaction_delta_term` | Rewards improvement in customer satisfaction from the previous step |
+| `satisfaction_level_term` | Rewards keeping service quality above the default operating baseline |
 | `inventory_balance_penalty` | Penalizes inventory drifting too far from the target operating range |
 | `overstock_penalty` | Extra penalty when inventory becomes excessively high |
 | `inventory_progress_reward` | Rewards movement back toward healthy inventory levels |
 | `controllable_stockout_penalty` | Penalizes stockouts caused by poor policy decisions |
-| `overpricing_penalty` | Penalizes aggressive positive price adjustments |
+| `contextual_overpricing_penalty` | Penalizes aggressive positive price adjustments more strongly when competitor pressure is high |
+| `budget_shortfall_penalty` | Penalizes burning the monthly budget below a safety floor |
 
 ### Concrete Shaping Used in `engine.py`
 
 ```text
-normalized_profit = (revenue - marketing - manual_restock - auto_restock) / 5000
-profit_term = normalized_profit * 8
-satisfaction_term = (satisfaction - previous_satisfaction) * 6
-reward is clamped to [-20, 20]
+net_profit = realized_revenue - executed_marketing - manual_restock_cost - auto_restock_cost
+net_profit_term = net_profit / 120
+satisfaction_delta_term = (satisfaction - previous_satisfaction) * 8
+satisfaction_level_term = (satisfaction - default_satisfaction) * 4
+reward is clamped to [-50, 50]
 ```
 
 ### Inventory Penalties
@@ -282,7 +287,7 @@ reward is clamped to [-20, 20]
 - Inventory target level: `0.45`
 - Inventory tolerance band: `+/- 0.15`
 - Overstock threshold: `0.8`
-- Stockout penalty applies only when the shortage is caused by the policy, not by an exogenous supply-shock event
+- Stockout penalty applies only when demand exceeds fulfilled inventory during the agent-controlled action, not from the exogenous post-step supply-shock adjustment
 
 ---
 
