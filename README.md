@@ -39,10 +39,10 @@ Key features:
 - random morning events such as inflation and supply shortages
 - benchmark task definitions and grading helpers
 
-Important update from older versions:
+Current environment interface:
 
-- The step action space currently has **3 fields**: `price_adjustment`, `marketing_spend`, and `restock_amount`
-- Shop selection is now handled through `reset(..., shop_type="...")`, not as a per-step `product_focus` field
+- The step action space has **3 fields**: `price_adjustment`, `marketing_spend`, and `restock_amount`
+- Shop selection is handled through `reset(..., shop_type="...")`, not as a per-step action field
 
 ---
 
@@ -208,7 +208,7 @@ Client -> OpenEnv/FastAPI app -> CampusMarketEnv.reset()/step()
 
 ### Step Computation Flow
 
-The older README described a four-control loop. In the current code, the step action has three controls, and shop focus comes from the episode-level `shop_type` chosen during `reset(...)`.
+The current code uses a three-control step action, and shop focus comes from the episode-level `shop_type` chosen during `reset(...)`.
 
 ```mermaid
 flowchart TD
