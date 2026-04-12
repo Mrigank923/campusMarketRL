@@ -2,5 +2,6 @@
 
 from .app import app
 from .environment import CampusMarketEnv
+from . import seasonal_trend_model
 
-__all__ = ["CampusMarketEnv", "app"]
+__all__ = ["CampusMarketEnv", "app", "seasonal_trend_model"]

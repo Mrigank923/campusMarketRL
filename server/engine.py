@@ -545,7 +545,8 @@ def compute_step(
     previous_observation: CampusMarketObservation,
     base_seed: int,
 ) -> StepComputation:
-    product_focus = ShopTypeEnum(action.product_focus)
+    # Get product focus from state (shop type), not from action
+    product_focus = ShopTypeEnum(state.shop_type)
     quarter = get_quarter(state.current_day)
     trend = get_trend(
         day=state.current_day,

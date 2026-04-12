@@ -52,5 +52,31 @@ Thumbs.db
 
 # Local tooling / generated local state
 .codex
-
 run_agent.py
+
+# Documentation (development/reference only - not pushed to GitHub)
+# pdoc/ folder contains guides, integration docs, and troubleshooting
+# Only the essential docs stay in root (README.md, REFACTORING_COMPLETE.md)
+pdoc/
+
+# Build and package artifacts
+openenv_campus_market_env.egg-info/
+*.egg-info/
+
+# Generated cache files
+shop_types.json
+
+# IDE and local development
+.vscode/
+.codex/
+*.code-workspace
+
+# Test and verification outputs
+.pytest_cache/
+.coverage/
+htmlcov/
+
+# Local testing artifacts
+test_results/
+tmp/
+temp/

@@ -14,7 +14,6 @@ from .config import (
     DEFAULT_BUDGET,
     GYM_MARKETING_SPEND_MAX,
     GYM_OBSERVATION_VECTOR_SIZE,
-    GYM_PRODUCT_FOCUS_COUNT,
     GYM_RESTOCK_AMOUNT_MAX,
     GYM_REVENUE_MAX,
     MAX_DAYS_PER_EPISODE,
@@ -32,12 +31,6 @@ PHASE_TO_INDEX: dict[str, float] = {
     PhaseEnum.ACTIVE.value: 1.0,
     PhaseEnum.CLOSING.value: 2.0,
 }
-PRODUCT_FOCUS_ORDER: tuple[ShopTypeEnum, ...] = (
-    ShopTypeEnum.CAFE,
-    ShopTypeEnum.STATIONARY,
-    ShopTypeEnum.FOOD,
-    ShopTypeEnum.TECH,
-)
 
 
 def observation_to_vector(observation: CampusMarketObservation) -> ObservationVector:
@@ -86,7 +79,6 @@ class CampusMarketGymEnv(gym.Env[ObservationVector, CampusMarketAction | RawActi
                     high=np.asarray([GYM_RESTOCK_AMOUNT_MAX], dtype=np.int32),
                     dtype=np.int32,
                 ),
-                "product_focus": spaces.Discrete(GYM_PRODUCT_FOCUS_COUNT),
             },
         )
         self.observation_space = spaces.Box(
@@ -153,14 +145,10 @@ class CampusMarketGymEnv(gym.Env[ObservationVector, CampusMarketAction | RawActi
         if isinstance(action, CampusMarketAction):
             return action
 
-        product_focus_value = self._extract_scalar(action["product_focus"])
-        product_focus_index = int(round(product_focus_value))
-        clamped_index = max(0, min(product_focus_index, len(PRODUCT_FOCUS_ORDER) - 1))
         return CampusMarketAction(
             price_adjustment=float(self._extract_scalar(action["price_adjustment"])),
             marketing_spend=float(max(0.0, self._extract_scalar(action["marketing_spend"]))),
             restock_amount=int(max(0.0, self._extract_scalar(action["restock_amount"]))),
-            product_focus=PRODUCT_FOCUS_ORDER[clamped_index].value,
         )
 
     @staticmethod

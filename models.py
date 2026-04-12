@@ -24,16 +24,6 @@ class CampusMarketAction(Action):
     price_adjustment: float = Field(ge=-1.0, le=1.0)
     marketing_spend: float = Field(ge=0.0)
     restock_amount: int = Field(ge=0)
-    product_focus: str
-
-    @field_validator("product_focus")
-    @classmethod
-    def validate_product_focus(cls, value: str) -> str:
-        if value not in _enum_values(ShopTypeEnum):
-            raise ValueError(
-                f"product_focus must be one of: {sorted(_enum_values(ShopTypeEnum))}",
-            )
-        return value
 
 
 class CampusMarketObservation(Observation):
@@ -84,6 +74,7 @@ class CampusMarketState(State):
     step_count: int = Field(default=0, ge=0)
     current_day: int = Field(ge=1)
     current_phase: str
+    shop_type: str = Field(default="cafe")
     total_steps: int = Field(default=0, ge=0)
     done: bool
     last_7_days_revenue: list[float] = Field(default_factory=list)

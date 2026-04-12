@@ -39,9 +39,17 @@ class CampusMarketEnv(
         self,
         seed: int | None = None,
         episode_id: str | None = None,
+        shop_type: str = "cafe",
         **kwargs: Any,
     ) -> CampusMarketObservation:
-        """Reset the simulation and return the opening observation."""
+        """Reset the simulation and return the opening observation.
+        
+        Args:
+            seed: Random seed for reproducibility
+            episode_id: Unique episode identifier
+            shop_type: Type of shop to simulate ("cafe", "food", "tech", "stationary", etc.)
+            **kwargs: Additional arguments (ignored)
+        """
         del kwargs
 
         if seed is not None:
@@ -53,6 +61,8 @@ class CampusMarketEnv(
             step_count=0,
         )
         self._market_state = create_initial_state(episode_id=self._state.episode_id)
+        # Set shop type for this episode
+        self._market_state.shop_type = shop_type
         initial_observation = build_initial_observation(
             state=self._market_state,
             base_seed=self._next_step_seed(),
