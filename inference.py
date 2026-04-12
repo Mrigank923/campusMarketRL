@@ -75,9 +75,9 @@ TASKS = [
 ]
 
 TASK_STEPS = {
-    "easy_steady_state": 5 * 3,  # 5 days * 3 phases
-    "medium_adaptive_pricing": 10 * 3,  # 10 days * 3 phases
-    "hard_full_horizon": 15 * 3,  # 15 days * 3 phases
+    "easy_steady_state": 10 * 3,  # 10 days * 3 phases
+    "medium_adaptive_pricing": 20 * 3,  # 20 days * 3 phases
+    "hard_full_horizon": 30 * 3,  # 30 days * 3 phases
 }
 
 VALID_PRODUCT_FOCUS: Final[tuple[str, ...]] = tuple(shop.value for shop in ShopTypeEnum)
@@ -117,7 +117,7 @@ def log_step(step: int, action: str, reward: float, done: bool, error: Optional[
 def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
     rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
     print(
-        f"[END] success={str(success).lower()} steps={steps} score={score:.4f} rewards={rewards_str}",
+        f"[END] success={str(success).lower()} steps={steps} score={score:.6f} rewards={rewards_str}",
         flush=True,
     )
 

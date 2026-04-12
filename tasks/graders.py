@@ -32,13 +32,23 @@ def clamp(value: float, lower: float, upper: float) -> float:
 
 def clamp_exclusive(value: float, epsilon: float = 0.001) -> float:
     """Clamp value to strictly (epsilon, 1-epsilon) to avoid 0.0 and 1.0 boundaries."""
-    return clamp(value, epsilon, 1.0 - epsilon)
+    # First clamp to [0, 1], then shift to (epsilon, 1-epsilon)
+    clamped = clamp(value, 0.0, 1.0)
+    # If exactly 0, shift to epsilon; if exactly 1, shift to 1-epsilon; otherwise squeeze into range
+    if clamped == 0.0:
+        return epsilon
+    elif clamped == 1.0:
+        return 1.0 - epsilon
+    else:
+        # Map value from (0, 1) to (epsilon, 1-epsilon)
+        return epsilon + clamped * (1.0 - 2.0 * epsilon)
 
 
 def score_at_least(actual: float, target: float) -> float:
     """Score for 'at least' criteria: scaled ratio, bounded to (0, 1) exclusive."""
     if target <= 0:
-        return clamp_exclusive(0.99)
+        # If target is invalid, return middle value strictly between 0 and 1
+        return 0.5
     score = clamp(actual / target, 0.0, 1.0)
     return clamp_exclusive(score)
 
@@ -46,7 +56,8 @@ def score_at_least(actual: float, target: float) -> float:
 def score_at_most(actual: float, limit: float) -> float:
     """Score for 'at most' criteria: penalize exceeding limit, bounded to (0, 1) exclusive."""
     if limit <= 0:
-        score = 1.0 if actual <= 0 else 0.0
+        # If limit is invalid, return middle value strictly between 0 and 1
+        return 0.5 if actual <= 0 else 0.5
     else:
         score = clamp(1.0 - (actual / limit), 0.0, 1.0)
     return clamp_exclusive(score)
@@ -248,10 +259,10 @@ def main() -> None:
         avg_satisfaction=0.52,
         stockout_fraction=0.12,
     )
-    print(f"  Grade: {easy.grade:.4f}")
+    print(f"  Grade: {easy.grade:.6f}")
     for c in easy.criteria:
         direction = "≥" if c.direction == "at_least" else "≤"
-        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.4f}")
+        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.6f}")
     
     print("\n📊 Medium Task (60 days):")
     medium = grade_medium(
@@ -260,10 +271,10 @@ def main() -> None:
         stockout_fraction=0.07,
         avg_reward=3.6,
     )
-    print(f"  Grade: {medium.grade:.4f}")
+    print(f"  Grade: {medium.grade:.6f}")
     for c in medium.criteria:
         direction = "≥" if c.direction == "at_least" else "≤"
-        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.4f}")
+        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.6f}")
     
     print("\n📊 Hard Task (90 days):")
     hard = grade_hard(
@@ -274,14 +285,14 @@ def main() -> None:
         final_budget=2500.0,
         final_awareness=0.67,
     )
-    print(f"  Grade: {hard.grade:.4f}")
+    print(f"  Grade: {hard.grade:.6f}")
     for c in hard.criteria:
         direction = "≥" if c.direction == "at_least" else "≤"
-        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.4f}")
+        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.6f}")
     
     overall = compute_overall_grade([easy, medium, hard])
     print("\n" + "=" * 70)
-    print(f"OVERALL GRADE: {overall:.4f} (range 0.0 – 1.0)")
+    print(f"OVERALL GRADE: {overall:.6f} (range 0.0 – 1.0)")
     print(f"Weights: easy 20% | medium 30% | hard 50%")
     print("=" * 70)
 
