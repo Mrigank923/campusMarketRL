@@ -36,6 +36,7 @@ ensure_source_package()
 # The platform checks for task graders during validation
 GRADERS = [
     "grade_action",
+    "grade_adverse",
 ]
 
 __all__ = [

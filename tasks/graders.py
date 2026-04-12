@@ -223,10 +223,109 @@ def grade_hard(
     )
 
 
+def grade_adverse(
+    cumulative_revenue: float,
+    avg_satisfaction: float,
+    satisfaction_variance: float,
+    stockout_fraction: float,
+    recovery_ratio: float,
+    avg_reward: float,
+    final_budget: float,
+    final_awareness: float,
+    competitor_survival_score: float,
+) -> TaskGrade:
+    """Grade adverse task: 40-day hostile-market resilience.
+
+    The adverse scenario tests whether the agent can sustain performance
+    under extreme conditions -- demand shocks, supply-chain disruptions,
+    aggressive competitor surges, and unpredictable trend reversals.
+
+    Key additional criteria vs hard:
+      - satisfaction_variance (at_most): penalises erratic satisfaction.
+      - recovery_ratio (at_least): fraction of detected shocks the agent
+        recovered from within 3 steps.
+      - competitor_survival_score (at_least): average (1 - competitor_pressure)
+        over the episode -- higher means the agent weathered competition.
+    """
+    criteria = [
+        CriterionScore(
+            "cumulative_revenue",
+            cumulative_revenue,
+            320000.0,
+            "at_least",
+        ),
+        CriterionScore(
+            "avg_satisfaction",
+            avg_satisfaction,
+            0.52,
+            "at_least",
+        ),
+        CriterionScore(
+            "satisfaction_variance",
+            satisfaction_variance,
+            0.04,
+            "at_most",
+        ),
+        CriterionScore(
+            "stockout_fraction",
+            stockout_fraction,
+            0.15,
+            "at_most",
+        ),
+        CriterionScore(
+            "recovery_ratio",
+            recovery_ratio,
+            0.60,
+            "at_least",
+        ),
+        CriterionScore(
+            "avg_reward",
+            avg_reward,
+            2.0,
+            "at_least",
+        ),
+        CriterionScore(
+            "final_budget",
+            final_budget,
+            800.0,
+            "at_least",
+        ),
+        CriterionScore(
+            "final_awareness",
+            final_awareness,
+            0.45,
+            "at_least",
+        ),
+        CriterionScore(
+            "competitor_survival_score",
+            competitor_survival_score,
+            0.50,
+            "at_least",
+        ),
+    ]
+
+    for c in criteria:
+        c.score = (
+            score_at_least(c.actual, c.target)
+            if c.direction == "at_least"
+            else score_at_most(c.actual, c.target)
+        )
+
+    grade = mean(c.score for c in criteria) if criteria else 0.5
+    grade = clamp_exclusive(round(grade, 4))
+    return TaskGrade(
+        task_name="adverse_hostile_market",
+        difficulty="adverse",
+        criteria=criteria,
+        grade=grade,
+    )
+
+
 DIFFICULTY_WEIGHTS = {
     "easy": 0.20,
     "medium": 0.30,
     "hard": 0.50,
+    "adverse": 0.25,
 }
 
 
@@ -290,10 +389,27 @@ def main() -> None:
         direction = "≥" if c.direction == "at_least" else "≤"
         print(f"    {c.name}: {c.actual:.6f} {direction} {c.target:.6f} → {c.score:.6f}")
     
-    overall = compute_overall_grade([easy, medium, hard])
+    print("\nAdverse Task (40 days -- hostile market):")
+    adverse = grade_adverse(
+        cumulative_revenue=280000.0,
+        avg_satisfaction=0.48,
+        satisfaction_variance=0.06,
+        stockout_fraction=0.18,
+        recovery_ratio=0.55,
+        avg_reward=1.8,
+        final_budget=650.0,
+        final_awareness=0.40,
+        competitor_survival_score=0.42,
+    )
+    print(f"  Grade: {adverse.grade:.6f}")
+    for c in adverse.criteria:
+        direction = ">=" if c.direction == "at_least" else "<="
+        print(f"    {c.name}: {c.actual:.6f} {direction} {c.target:.6f} -> {c.score:.6f}")
+    
+    overall = compute_overall_grade([easy, medium, hard, adverse])
     print("\n" + "=" * 70)
-    print(f"OVERALL GRADE: {overall:.6f} (range 0.0 – 1.0)")
-    print(f"Weights: easy 20% | medium 30% | hard 50%")
+    print(f"OVERALL GRADE: {overall:.6f} (range 0.0 - 1.0)")
+    print(f"Weights: easy 20% | medium 30% | hard 50% | adverse 25%")
     print("=" * 70)
 
 

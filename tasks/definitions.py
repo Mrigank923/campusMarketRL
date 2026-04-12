@@ -38,6 +38,28 @@ TASKS = {
             "final_awareness": 0.65,
         },
     },
+
+    "adverse_hostile_market": {
+        "description": (
+            "Survive a hostile 40-day episode with stochastic demand shocks, "
+            "supply-chain disruptions, aggressive competitor surges, and "
+            "unpredictable trend reversals. The environment actively tries "
+            "to destabilise the agent."
+        ),
+        "expected_metric": "resilience + recovery",
+        "steps": 120,  # 40 days × 3 phases
+        "criteria": {
+            "cumulative_revenue": 320000.0,
+            "avg_satisfaction": 0.52,
+            "satisfaction_variance": 0.04,      # must keep variance ≤ this
+            "max_stockout_fraction": 0.15,
+            "recovery_ratio": 0.60,             # fraction of shocks recovered within 3 steps
+            "avg_reward": 2.0,
+            "final_budget": 800.0,
+            "final_awareness": 0.45,
+            "competitor_survival_score": 0.50,   # avg(1 - competitor_pressure) over episode
+        },
+    },
 }
 
 TASK_NAMES = list(TASKS.keys())
