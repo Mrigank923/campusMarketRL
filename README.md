@@ -1,44 +1,58 @@
 ---
-title: Campus Market RL
+title: Campus Market Environment
+emoji: 🏪
+colorFrom: green
+colorTo: yellow
 sdk: docker
 app_port: 7860
 ---
 
-<div align="center">
+# CampusMarket RL — OpenEnv + Gymnasium Campus Shop Simulation
 
-# Campus Market RL
+[![OpenEnv Compatible](https://img.shields.io/badge/OpenEnv-Compatible-brightgreen.svg)]()
+[![Gymnasium Compatible](https://img.shields.io/badge/Gymnasium-Compatible-blue.svg)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-Production_Ready-teal.svg)]()
+[![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg)]()
+[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-green.svg)]()
+[![Pydantic v2](https://img.shields.io/badge/Pydantic-v2-e92063.svg)]()
 
-### OpenEnv-Compatible Reinforcement Learning Environment for Campus Retail Strategy
+> Run a campus shop through demand swings, competitor pressure, budget limits, and seasonal shifts. Tune price, marketing, and inventory while trying to keep both profit and satisfaction healthy.
 
-**Price smart. Stock wisely. Win the quad.**
+## Project Overview
 
-[![Built on OpenEnv](https://img.shields.io/badge/Built%20on-OpenEnv-blue)](https://github.com/meta-pytorch/OpenEnv)
-[![Python 3.10+](https://img.shields.io/badge/Python-3.10%2B-green)](https://python.org)
-[![FastAPI + Gymnasium + Docker](https://img.shields.io/badge/Runtime-FastAPI%20%2B%20Gymnasium%20%2B%20Docker-009688)](https://fastapi.tiangolo.com/)
-[![Inference: OpenAI-Compatible](https://img.shields.io/badge/Inference-OpenAI%20Compatible-orange)](https://github.com/openai/openai-python)
-[![Hugging Face Space Ready](https://img.shields.io/badge/HuggingFace-Docker%20Space-yellow)](https://huggingface.co/)
+CampusMarket RL is a deterministic reinforcement learning environment for simulating a small shop on a university campus. The agent manages day-to-day retail decisions while the environment models student demand, seasonality, competition, budget usage, inventory flow, and customer satisfaction.
 
-[**Open the Repository**](https://github.com/Mrigank923/campusMarketRL)
+The project exposes the same core simulation in multiple ways:
 
-</div>
+- an OpenEnv-compatible FastAPI server
+- a direct Python environment class
+- a Gymnasium wrapper for fixed-size vector observations
+- example inference and smoke-test scripts
+
+Key features:
+
+- 90-day environment with `morning`, `active`, and `closing` phases
+- seeded, reproducible transitions for evaluation
+- student demand clusters with different budgets and price sensitivity
+- deterministic competitor generation and normalized competitor pressure
+- seasonal trends: `normal`, `festival`, `exam`, and `holiday`
+- random morning events such as inflation and supply shortages
+- benchmark task definitions and grading helpers
+
+Important update from older versions:
+
+- The step action space currently has **3 fields**: `price_adjustment`, `marketing_spend`, and `restock_amount`
+- Shop selection is now handled through `reset(..., shop_type="...")`, not as a per-step `product_focus` field
 
 ---
 
-## What Is This?
+## TL;DR
 
-A **Gymnasium-compatible, OpenEnv-compatible RL environment** where a single agent operates a campus market across a 90-day episode. At every step, the agent controls four levers: **pricing**, **marketing spend**, **restocking**, and **product focus**.
-
-The environment simulates realistic retail pressure from three directions at once:
-
-- **Student demand clusters** with different budgets, preferences, and price sensitivity
-- **Nearby competitors** that create pricing and marketing pressure
-- **Seasonal campus trends** such as festival, exam, and holiday periods
-
-Each action affects traffic, conversion, revenue, inventory, satisfaction, budget, and long-term reward. The runtime is deterministic under a seed, exposes a clean HTTP/WebSocket API through OpenEnv, includes a Gymnasium wrapper for RL workflows, and ships with benchmark tasks plus a grading script for evaluation.
-
-This repo focuses on the environment package, server, wrappers, benchmark tasks, and deployment files. It does **not** include a separate frontend app or a multi-stage training pipeline.
-
-> Built around an OpenEnv-compatible environment package, with local server entrypoints, benchmark tasks, and deployment files included in the repo.
+- OpenEnv-compatible server with `/reset`, `/step`, `/state`, `/schema`, and `/ws`
+- Gymnasium wrapper with an 11-feature observation vector
+- Deterministic environment under a fixed seed
+- Core simulation includes demand, competition, seasonality, inventory, and reward shaping
+- Example scripts included for local testing, inference, seasonal experiments, and shop generation
 
 ---
 
@@ -46,19 +60,16 @@ This repo focuses on the environment package, server, wrappers, benchmark tasks,
 
 - [Quick Start](#quick-start)
 - [Architecture](#architecture)
-- [The Four Action Controls](#the-four-action-controls)
+- [Environment Description](#environment-description)
+- [Action Space](#action-space)
+- [Observation Space](#observation-space)
 - [Reward Function](#reward-function)
-- [Seasonal Trends and Random Events](#seasonal-trends-and-random-events)
-- [Evaluation Pipeline](#evaluation-pipeline)
-- [Interfaces](#interfaces)
-- [Supported Models](#supported-models)
-- [API Reference](#api-reference)
+- [Dynamics](#dynamics)
+- [Benchmark Tasks](#benchmark-tasks)
+- [Usage](#usage)
 - [Project Structure](#project-structure)
 - [Configuration](#configuration)
-- [Key Design Decisions](#key-design-decisions)
-- [Research Inspirations](#research-inspirations)
-- [Contributing](#contributing)
-- [License](#license)
+- [Additional Notes](#additional-notes)
 
 ---
 
@@ -67,386 +78,634 @@ This repo focuses on the environment package, server, wrappers, benchmark tasks,
 ### Prerequisites
 
 - Python 3.10+
-- Optional: `HF_TOKEN` if you want to run `inference.py` with a hosted model
+- `pip`
+- Optional: Docker
+- Optional: API credentials if you want to run the LLM-driven scripts
 
 ### Installation
 
 ```bash
-# Clone
 git clone https://github.com/Mrigank923/campusMarketRL.git
 cd campusMarketRL
+```
 
-# Install dependencies
+Create a virtual environment:
+
+```bash
+python -m venv .venv
+source .venv/bin/activate
+```
+
+Windows PowerShell:
+
+```powershell
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+```
+
+Install dependencies:
+
+```bash
 pip install -r requirements.txt
 pip install -e .
+```
 
-# Optional Gymnasium support
-pip install -e .[gym]
+Optional Gymnasium support:
 
-# Optional inference configuration
+```bash
+pip install -e ".[gym]"
+```
+
+Optional environment file:
+
+```bash
 cp .env.example .env
 ```
 
-### Run the Environment Server
+Start the server:
 
 ```bash
-# Option A: convenience entrypoint
 python main.py
-
-# Option B: package entrypoint
-server --port 7860
 ```
 
 Open:
 
 - `http://localhost:7860/docs`
 
-### Deployment Files
-
-The repo includes deployment-related files:
-
-- `Dockerfile`
-- `server/Dockerfile`
-- `openenv.yaml`
-- `validate-submission.sh`
-
-### Headless Mode
-
-```bash
-# Local smoke test
-python test_env.py
-
-# Run benchmark tasks and generate a grading report
-python tasks/grader.py
-
-# Run the sample LLM-driven inference loop
-python inference.py
-```
-
 ---
 
 ## Architecture
 
-```text
- ┌────────────────────────────────────────────────────────────────────────────┐
- │                                                                            │
- │   CLIENT LAYER                                                             │
- │                                                                            │
- │   Raw HTTP          OpenEnv Client         Gymnasium Wrapper      LLM Loop  │
- │   curl / requests   CampusMarketEnvClient  CampusMarketGymEnv     inference │
- │                                                                            │
- │   POST /reset       WebSocket session      fixed-size vector      OpenAI-   │
- │   POST /step        compatible client      observations           compatible │
- │   GET /state                                                             │
- │                                                                            │
- ├────────────────────────────────────────────────────────────────────────────┤
- │                                                                            │
- │   SERVICE LAYER  (FastAPI + OpenEnv HTTP server)                           │
- │                                                                            │
- │   main.py / server.app                                                     │
- │   /health   /reset   /step   /state   /schema   /ws                        │
- │   OpenEnv-generated HTTP API and interactive docs                          │
- │                                                                            │
- ├────────────────────────────────────────────────────────────────────────────┤
- │                                                                            │
- │   CORE ENVIRONMENT                                                         │
- │                                                                            │
- │   CampusMarketEnv                                                          │
- │   reset() -> create_initial_state() -> build_initial_observation()         │
- │   step(action) -> compute_step() -> transition_after_step()                │
- │                                                                            │
- ├────────────────────────────────────────────────────────────────────────────┤
- │                                                                            │
- │   SIMULATION ENGINE                                                        │
- │                                                                            │
- │   engine.py            state_manager.py         models.py / enums.py       │
- │   reward shaping       day + phase advances     typed actions + state      │
- │   traffic model        rolling 7-day memory     Pydantic validation        │
- │   inventory logic                                                           │
- │                                                                            │
- ├────────────────────────────────────────────────────────────────────────────┤
- │                                                                            │
- │   MARKET SIGNALS                                                           │
- │                                                                            │
- │   student_model.py      competitor_model.py      trend_model.py            │
- │   student clusters      competitor pressure      seasonal demand           │
- │   budgets + prefs       pricing + inventory      festival/exam/holiday     │
- │                                                                            │
- ├────────────────────────────────────────────────────────────────────────────┤
- │                                                                            │
- │   EVALUATION                                                               │
- │                                                                            │
- │   tasks/task_easy.py   tasks/task_medium.py   tasks/task_hard.py           │
- │   tasks/grader.py -> weighted overall grade + grading_report.txt           │
- │                                                                            │
- └────────────────────────────────────────────────────────────────────────────┘
+The project is organized as a layered environment stack: clients talk to an OpenEnv-compatible FastAPI server, which wraps the core environment class, which delegates simulation logic to the pure engine and transition helpers.
+
+```mermaid
+flowchart TD
+    subgraph Clients["Client Layer"]
+        A1["HTTP / WebSocket Clients"]
+        A2["CampusMarketEnvClient"]
+        A3["CampusMarketGymEnv"]
+        A4["inference.py / test_env.py"]
+    end
+
+    subgraph Service["Service Layer"]
+        B1["main.py"]
+        B2["server/app.py<br/>OpenEnv create_app(...)"]
+    end
+
+    subgraph Env["Environment Layer"]
+        C1["server/environment.py<br/>CampusMarketEnv"]
+        C2["models.py<br/>Action / Observation / State"]
+    end
+
+    subgraph Core["Simulation Core"]
+        D1["server/engine.py<br/>traffic, conversion, inventory, reward"]
+        D2["server/state_manager.py<br/>phase/day transitions, rolling memory"]
+    end
+
+    subgraph Signals["Market Signal Models"]
+        E1["server/student_model.py"]
+        E2["server/competitor_model.py"]
+        E3["server/trend_model.py"]
+    end
+
+    subgraph Helpers["Supporting Modules"]
+        F1["config.py / enums.py"]
+        F2["tasks/definitions.py / tasks/graders.py"]
+        F3["seasonal_trend_model.py / shop_generator.py<br/>experimental or auxiliary"]
+    end
+
+    A1 --> B2
+    A2 --> B2
+    A3 --> C1
+    A4 --> B2
+    A4 --> C1
+
+    B1 --> B2
+    B2 --> C1
+    C1 --> C2
+    C1 --> D1
+    C1 --> D2
+
+    D1 --> E1
+    D1 --> E2
+    D1 --> E3
+    D1 --> F1
+    D2 --> F1
+
+    C1 --> F2
+    D1 -. optional / separate tooling .-> F3
 ```
 
-### Environment Step Flow
+### Runtime Flow
+
+The main server path is:
 
 ```text
- Environment State
-       │
-       ▼
- Read observation {traffic, conversion, revenue, satisfaction, inventory,
- budget, awareness, sentiment, competitor pressure, trend}
-       │
-       ▼
- Choose action {price_adjustment, marketing_spend, restock_amount, product_focus}
-       │
-       ▼
- Budget validation and action capping
-       │
-       ▼
- Market simulation
- student clusters -> competitor pressure -> trend -> traffic -> conversion
-       │
-       ▼
- Business update
- revenue -> inventory -> auto-restock -> satisfaction
-       │
-       ▼
- Event injection
- inflation / supply shortage / competitor discount
-       │
-       ▼
- Reward shaping
- profit + satisfaction delta + inventory progress - penalties
-       │
-       ▼
- Advance phase/day and update rolling 7-day memory
+Client -> OpenEnv/FastAPI app -> CampusMarketEnv.reset()/step()
+       -> engine.compute_step() + state_manager.transition_after_step()
+       -> structured observation + reward + info
+```
+
+### Step Computation Flow
+
+The older README described a four-control loop. In the current code, the step action has three controls, and shop focus comes from the episode-level `shop_type` chosen during `reset(...)`.
+
+```mermaid
+flowchart TD
+    S0["Reset episode<br/>seed + shop_type"] --> S1["Current state<br/>day, phase, budget, inventory, memory"]
+    S1 --> S2["Get seasonal trend<br/>trend_model.py"]
+    S2 --> S3["Generate student clusters<br/>student_model.py"]
+    S3 --> S4["Align clusters to shop_type<br/>from state.shop_type"]
+    S4 --> S5["Adjust clusters for phase<br/>morning / active / closing"]
+    S5 --> S6["Generate competitors<br/>competitor_model.py"]
+    S6 --> S7["Compute competitor pressure"]
+
+    S7 --> S8["Apply action<br/>price_adjustment<br/>marketing_spend<br/>restock_amount"]
+    S8 --> S9["Compute awareness, traffic, conversion"]
+    S9 --> S10["Execute inventory flow<br/>manual restock + sales + auto-restock"]
+    S10 --> S11["Apply morning-only random events<br/>inflation / supply_shortage / competitor_discount"]
+    S11 --> S12["Compute satisfaction, sentiment, reward"]
+    S12 --> S13["Advance phase/day<br/>update rolling 7-day memory"]
+    S13 --> S14["Return observation + reward + done + info"]
+```
+
+### Component Responsibilities
+
+- `server/app.py`: exposes the environment through OpenEnv/FastAPI endpoints
+- `server/environment.py`: owns session state, reset/step orchestration, and metadata
+- `server/engine.py`: computes the actual market dynamics and reward
+- `server/state_manager.py`: advances phase/day and maintains 7-day rolling memory
+- `models.py`: defines strict Pydantic schemas for actions, observations, and state
+- `gym_env.py`: adapts structured observations to a fixed Gymnasium vector
+- `client.py`: provides an OpenEnv client wrapper for remote interaction
+
+---
+
+## Environment Description
+
+The environment simulates a campus retail shop over a maximum of **90 days**, with **3 phases per day**:
+
+- `morning`
+- `active`
+- `closing`
+
+This yields a maximum episode length of **270 steps**.
+
+At a high level, each step works like this:
+
+1. The environment reads the current day, phase, budget, inventory, awareness, and rolling memory.
+2. A seasonal trend is chosen deterministically for the current day.
+3. Student clusters are generated with different sizes, budgets, category preferences, and price sensitivity.
+4. Competitor shops are generated and collapsed into a normalized `competitor_pressure` score.
+5. The agent action is applied:
+   - `price_adjustment` changes effective selling price and conversion
+   - `marketing_spend` increases awareness but consumes budget
+   - `restock_amount` buys more units if budget and capacity allow
+6. Demand is converted into traffic, sales, revenue, inventory movement, and satisfaction updates.
+7. A morning-only random event may apply:
+   - `inflation`
+   - `supply_shortage`
+   - `competitor_discount`
+8. Reward is computed from profit, satisfaction, inventory balance, pricing behavior, and budget health.
+9. The phase advances, and after each `closing` step the last-7-days memory is updated.
+
+### Shop Types
+
+The environment supports these shop types:
+
+- `cafe`
+- `food`
+- `tech`
+- `stationary`
+
+The selected `shop_type` is stored in environment state and affects demand alignment and competitor matching. It is set when resetting the environment:
+
+```python
+obs = env.reset(seed=42, shop_type="food")
+```
+
+### State Behavior
+
+The environment tracks both immediate metrics and rolling business context:
+
+- current day and phase
+- total step count
+- monthly budget
+- inventory level
+- awareness
+- rolling last 7 days of revenue
+- rolling last 7 days of satisfaction
+
+The monthly budget resets every 30 in-simulation days.
+
+---
+
+## Action Space
+
+The step action is defined by `CampusMarketAction` in `models.py`.
+
+### Raw Environment Action
+
+```json
+{
+  "price_adjustment": 0.1,
+  "marketing_spend": 250.0,
+  "restock_amount": 40
+}
+```
+
+| Field | Type | Space | Range | Description |
+| --- | --- | --- | --- | --- |
+| `price_adjustment` | `float` | Continuous | `[-1.0, 1.0]` | Relative price movement. Positive raises price, negative discounts. |
+| `marketing_spend` | `float` | Continuous | `[0, +inf)` | Marketing budget requested for the current step. |
+| `restock_amount` | `int` | Discrete count | `[0, +inf)` | Requested number of units to manually restock. |
+
+Execution notes:
+
+- Marketing spend is capped by remaining budget.
+- Restocking is limited by both remaining budget and inventory capacity.
+- Inventory capacity is `400` units.
+- Manual and auto-restock cost `1.8` per unit.
+
+### Gymnasium Action Space
+
+`CampusMarketGymEnv` exposes a `spaces.Dict` action space:
+
+- `price_adjustment`: `Box(low=-1.0, high=1.0, shape=(1,), dtype=float32)`
+- `marketing_spend`: `Box(low=0.0, high=2000.0, shape=(1,), dtype=float32)`
+- `restock_amount`: `Box(low=0, high=200, shape=(1,), dtype=int32)`
+
+### Example Actions
+
+Conservative:
+
+```json
+{
+  "price_adjustment": 0.0,
+  "marketing_spend": 100.0,
+  "restock_amount": 10
+}
+```
+
+Promotional push:
+
+```json
+{
+  "price_adjustment": -0.15,
+  "marketing_spend": 500.0,
+  "restock_amount": 60
+}
+```
+
+Margin-seeking move:
+
+```json
+{
+  "price_adjustment": 0.08,
+  "marketing_spend": 80.0,
+  "restock_amount": 5
+}
 ```
 
 ---
 
-## The Four Action Controls
+## Observation Space
 
-| Control | Type | What It Does | Main Tradeoff |
-|---------|------|--------------|---------------|
-| `price_adjustment` | `float` in `[-1.0, 1.0]` | Raises or lowers effective price | Higher prices can improve revenue per sale but reduce conversion and add overpricing penalty |
-| `marketing_spend` | `float >= 0` | Improves awareness and future traffic | Immediate budget burn versus long-term demand lift |
-| `restock_amount` | `int >= 0` | Adds inventory units before sales are realized | Prevents stockouts but can create overstock and budget drain |
-| `product_focus` | `cafe \| food \| tech \| stationary` | Reorients the shop toward a category | Better alignment with student preferences and seasonal demand, but can mismatch current traffic |
+The raw environment returns a `CampusMarketObservation`.
 
-### Observation Space
+### Raw Observation Schema
 
-Each step returns a structured observation with the business signals the agent must react to:
+| Field | Type | Meaning |
+| --- | --- | --- |
+| `day` | `int` | Current day in the episode, starting at 1 |
+| `phase` | `str` | One of `morning`, `active`, `closing` |
+| `shop_traffic` | `int` | Number of visitors for the current step |
+| `conversion_rate` | `float` | Fraction of visitors who purchase |
+| `revenue` | `float` | Revenue produced in the current step |
+| `customer_satisfaction` | `float` | Satisfaction score in `[0, 1]` |
+| `satisfaction` | `float` | Alias kept synchronized with `customer_satisfaction` |
+| `inventory_level` | `float` | Normalized inventory fill in `[0, 1]` |
+| `monthly_budget` | `float` | Remaining monthly budget |
+| `awareness` | `float` | Shop awareness in `[0, 1]` |
+| `market_sentiment` | `float` | Aggregate market signal in `[0, 1]` |
+| `competitor_pressure` | `float` | Competitive pressure in `[0, 1]` |
+| `trend_factor` | `float` | Seasonal demand multiplier |
+| `reward` | `float` | Reward assigned to the transition |
+| `done` | `bool` | Whether the episode is finished |
+| `info` | `dict` | Transition/debug information |
+| `metadata` | `dict` | Metadata such as seed, step, and day |
 
-- `day`, `phase`
-- `shop_traffic`, `conversion_rate`, `revenue`
-- `customer_satisfaction`, `inventory_level`
-- `monthly_budget`, `awareness`, `market_sentiment`
-- `competitor_pressure`, `trend_factor`
+Typical `info` fields include:
 
-The Gymnasium wrapper projects this into an 11-feature fixed vector for standard RL tooling.
+- `executed_day`
+- `executed_phase`
+- `next_day`
+- `next_phase`
+- `trend`
+- `quarter`
+- `cluster_count`
+- `price_sensitivity`
+- `realized_sales`
+- `lost_sales`
+- `stockout_flag`
+- `event`
+- `executed_marketing_spend`
+- `manual_restock_units`
+- `auto_restock_units`
+- `effective_base_price`
+- `net_profit`
+
+### Gymnasium Observation Space
+
+The Gymnasium wrapper converts the structured observation into an 11-dimensional `float32` vector:
+
+```text
+[
+  day,
+  phase_index,
+  shop_traffic,
+  conversion_rate,
+  revenue,
+  customer_satisfaction,
+  inventory_level,
+  monthly_budget,
+  awareness,
+  market_sentiment,
+  competitor_pressure
+]
+```
+
+Phase mapping:
+
+- `morning -> 0.0`
+- `active -> 1.0`
+- `closing -> 2.0`
+
+Observation feature names are defined in `config.py` as `OBSERVATION_FEATURE_NAMES`.
 
 ---
 
 ## Reward Function
 
-The reward is **profit-first**, but shaped to discourage brittle strategies such as overpricing, overstocking, or letting service quality collapse.
+The reward is computed in `server/engine.py` and then clamped to `[-50.0, 50.0]`.
+
+At a high level, the reward combines:
+
+- net profit from revenue minus marketing and restocking costs
+- satisfaction improvement over the previous step
+- absolute satisfaction level relative to the default baseline
+- inventory balance around the target level
+- reward for moving inventory toward the target range
+- penalties for overstocking
+- penalties for controllable stockouts
+- penalties for aggressive overpricing
+- penalties when the remaining monthly budget gets too low
+
+Core terms:
 
 ```text
-R = profit_term
+reward =
+  net_profit / 120
   + satisfaction_delta_term
+  + satisfaction_level_term
   - inventory_balance_penalty
   - overstock_penalty
   + inventory_progress_reward
   - controllable_stockout_penalty
   - overpricing_penalty
+  - budget_shortfall_penalty
 ```
 
-### Reward Components
+Important constants from `config.py`:
 
-| Component | Description |
-|-----------|-------------|
-| `profit_term` | Normalized gross profit after marketing, manual restocking, and auto-restocking costs |
-| `satisfaction_delta_term` | Rewards improvement in customer satisfaction from the previous step |
-| `inventory_balance_penalty` | Penalizes inventory drifting too far from the target operating range |
-| `overstock_penalty` | Extra penalty when inventory becomes excessively high |
-| `inventory_progress_reward` | Rewards movement back toward healthy inventory levels |
-| `controllable_stockout_penalty` | Penalizes stockouts caused by poor policy decisions |
-| `overpricing_penalty` | Penalizes aggressive positive price adjustments |
+- inventory target level: `0.45`
+- inventory target tolerance: `0.15`
+- overstock level: `0.8`
+- controllable stockout penalty: `12.0`
+- reward clamp: `[-50.0, 50.0]`
 
-### Concrete Shaping Used in `engine.py`
+This makes the environment profit-oriented, but not profit-only. High prices, low inventory, or budget exhaustion can still reduce long-term reward.
 
-```text
-normalized_profit = (revenue - marketing - manual_restock - auto_restock) / 5000
-profit_term = normalized_profit * 8
-satisfaction_term = (satisfaction - previous_satisfaction) * 6
-reward is clamped to [-20, 20]
+---
+
+## Dynamics
+
+### Student Demand Model
+
+Each day the engine generates deterministic student clusters using the seed, day, and current trend.
+
+Cluster behavior includes:
+
+- `3` to `6` clusters in normal conditions
+- up to `4` clusters during holidays
+- different budget bands, cluster sizes, and price sensitivity
+- a preferred shop category from the supported shop types
+
+Budget bands and sensitivity ranges:
+
+- low-budget clusters: budget `70-120`, sensitivity roughly `0.65-0.95`
+- mid-budget clusters: budget `121-220`, sensitivity roughly `0.35-0.70`
+- high-budget clusters: budget `221-360`, sensitivity roughly `0.10-0.45`
+
+### Competitor Model
+
+The environment generates `4` competitor shops per step.
+
+Each competitor has:
+
+- `shop_type`
+- `pricing_factor`
+- `marketing_power`
+- `inventory_level`
+
+Competitor pressure is normalized into `[0, 1]`. Same-type competitors matter more than cross-category competitors.
+
+### Seasonal Trends
+
+The core environment uses `server/trend_model.py` with four trend types:
+
+- `normal`
+- `festival`
+- `exam`
+- `holiday`
+
+Trend multipliers:
+
+- `normal -> 1.0`
+- `festival -> 1.3`
+- `exam -> 0.7`
+- `holiday -> 0.5`
+
+### Random Events
+
+Random events are checked only in the `morning` phase:
+
+- inflation: probability `0.03`
+- supply shortage: probability `0.03`
+- competitor discount: probability `0.03`
+
+Effects:
+
+- inflation increases effective base price
+- supply shortage reduces inventory
+- competitor discount increases competitor pressure
+
+---
+
+## Benchmark Tasks
+
+The repository currently includes:
+
+- task definitions in `tasks/definitions.py`
+- scoring helpers in `tasks/graders.py`
+
+Defined tasks:
+
+| Task | Steps | Purpose |
+| --- | --- | --- |
+| `easy_steady_state` | `30` | Basic revenue, satisfaction, and stockout control |
+| `medium_adaptive_pricing` | `60` | Better adaptation to changing market conditions |
+| `hard_full_horizon` | `90` | Stronger long-horizon management targets |
+| `adverse_hostile_market` | `120` | More hostile scenario with resilience-focused grading |
+
+Current grading targets in `tasks/graders.py`:
+
+### Easy
+
+- cumulative revenue: at least `75000`
+- average satisfaction: at least `0.55`
+- stockout fraction: at most `0.10`
+
+### Medium
+
+- cumulative revenue: at least `180000`
+- average satisfaction: at least `0.58`
+- stockout fraction: at most `0.08`
+- average reward: at least `3.5`
+
+### Hard
+
+- cumulative revenue: at least `400000`
+- average satisfaction: at least `0.60`
+- stockout fraction: at most `0.06`
+- average reward: at least `4.0`
+- final budget: at least `2000`
+- final awareness: at least `0.65`
+
+### Adverse
+
+The adverse grader adds resilience-oriented criteria such as:
+
+- satisfaction variance
+- recovery ratio
+- competitor survival score
+
+Note:
+
+- The repo currently ships the definitions and grading logic, but not a dedicated `tasks/grader.py` runner script in the `tasks/` folder.
+- `inference.py` includes its own task loop for `easy`, `medium`, and `hard`.
+
+---
+
+## Usage
+
+### 1. Run the environment server
+
+```bash
+python main.py
 ```
 
-### Inventory Penalties
+Alternative entrypoint:
 
-- Inventory target level: `0.45`
-- Inventory tolerance band: `+/- 0.15`
-- Overstock threshold: `0.8`
-- Stockout penalty applies only when the shortage is caused by the policy, not by an exogenous supply-shock event
-
----
-
-## Seasonal Trends and Random Events
-
-The campus market is not stationary. Demand shifts over time, and the environment injects occasional shocks that test policy robustness.
-
-### Seasonal Trend Types
-
-| Trend | Multiplier | Typical Effect |
-|-------|------------|----------------|
-| `normal` | `1.0x` | Baseline traffic and conversion |
-| `festival` | `1.3x` | Higher demand and stronger spending |
-| `exam` | `0.7x` | Lower traffic and more cautious purchasing |
-| `holiday` | `0.5x` | Reduced campus activity and fewer student clusters |
-
-Trend selection is deterministic from **day + quarter + seed**, so experiments are reproducible.
-
-### Random Event Types
-
-| Event | Probability | Effect |
-|-------|-------------|--------|
-| `inflation` | `3%` | Raises effective base price via multiplier |
-| `supply_shortage` | `3%` | Reduces inventory level unexpectedly |
-| `competitor_discount` | `3%` | Temporarily increases competitor pressure |
-
-### Day Structure
-
-| Phase | Traffic Multiplier | Purpose |
-|-------|--------------------|---------|
-| `morning` | `0.78x` | Lighter opening traffic |
-| `active` | `1.00x` | Main shopping window |
-| `closing` | `0.68x` | End-of-day slowdown |
-
----
-
-## Evaluation Pipeline
-
-```text
- ┌──────────────┐     ┌───────────────────┐     ┌──────────────────────┐
- │  Policy /    │────►│  CampusMarketEnv   │────►│  Benchmark Tasks      │
- │  Heuristic   │     │  reset + step      │     │  easy / medium / hard │
- └──────────────┘     └───────────────────┘     └──────────┬───────────┘
-                                                            │
-                                                            ▼
-                                                   ┌──────────────────────┐
-                                                   │  tasks/grader.py      │
-                                                   │  weighted scoring      │
-                                                   │  grading_report.txt    │
-                                                   └──────────────────────┘
+```bash
+server --host 0.0.0.0 --port 7860
 ```
 
-### Benchmark Tasks
+Useful endpoints:
 
-| Task | Horizon | What It Tests | Main Metrics |
-|------|---------|---------------|--------------|
-| `easy_steady_state` | 30 days | Basic retail control | Revenue, average satisfaction, stockout fraction |
-| `medium_adaptive_pricing` | 60 days | Stronger adaptation to trend and pressure | Revenue, satisfaction, stockouts, average reward |
-| `hard_full_horizon` | 90 days | Full-episode budget and awareness management | Revenue, satisfaction, stockouts, reward, final budget, final awareness |
+- `GET /health`
+- `POST /reset`
+- `POST /step`
+- `GET /state`
+- `GET /schema`
+- `WS /ws`
 
-### How It Works
+### 2. Run a local smoke test
 
-1. `task_easy.py`, `task_medium.py`, and `task_hard.py` run reference policies against the same environment.
-2. Each task captures cumulative revenue, satisfaction, reward, and stockout behavior.
-3. `tasks/grader.py` normalizes each criterion into a score in `[0, 1]`.
-4. The final weighted grade uses `easy=20%`, `medium=30%`, and `hard=50%`.
-5. A text report is saved to `tasks/grading_report.txt`.
-
-### Submission Validation
-
-`validate-submission.sh` performs the final OpenEnv submission checks:
-
-1. Pings the deployed Hugging Face Space
-2. Attempts a local Docker build
-3. Runs `openenv validate`
-
----
-
-## Interfaces
-
-This project does not ship a dedicated frontend application. The repo exposes the environment through lightweight interfaces that are actually present in the folder.
-
-### Included Access Paths
-
-- Interactive API documentation from the OpenEnv/FastAPI app
-- Raw REST endpoints for reset/step/state/schema
-- OpenEnv WebSocket client support through `CampusMarketEnvClient`
-- Gymnasium wrapper support through `CampusMarketGymEnv`
-- A static HTML page asset in `static/index.html`
-
-This keeps the repo lightweight while still making the environment easy to inspect and use locally or in deployment.
-
----
-
-## Supported Models
-
-The environment itself is **model-agnostic**. It does not require an LLM to run. The only model-related file in this repo is `inference.py`, which can drive the environment with an external **OpenAI-compatible chat model** that returns the required JSON action schema.
-
-| Mode / Model | Backend | Notes |
-|--------------|---------|-------|
-| Any Hugging Face-hosted chat model | Hugging Face Router | Set the model name through `MODEL_NAME` |
-| Any OpenAI-compatible endpoint | Custom `API_BASE_URL` | Usable if the model can follow the JSON-only action schema |
-| No model available | Built-in heuristic fallback | `inference.py` falls back to a safe default policy if the API call fails or no token is set |
-
----
-
-## API Reference
-
-### REST Endpoints (port `7860`)
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `GET` | `/health` | Server health check |
-| `POST` | `/reset` | Start a new episode and return the initial observation |
-| `POST` | `/step` | Apply one action and return the next observation + reward |
-| `GET` | `/state` | Current environment state snapshot |
-| `GET` | `/schema` | OpenEnv action / observation schema metadata |
-
-### WebSocket
-
-| Endpoint | Description |
-|----------|-------------|
-| `WS /ws` | Persistent OpenEnv session channel |
-
-### Example Step Payload
-
-```json
-{
-  "action": {
-    "price_adjustment": 0.08,
-    "marketing_spend": 150.0,
-    "restock_amount": 20,
-    "product_focus": "food"
-  }
-}
+```bash
+python test_env.py
 ```
 
-### Example OpenEnv Client Usage
+Heuristic mode:
+
+```bash
+python test_env.py --heuristic
+```
+
+LLM-assisted mode:
+
+```bash
+python test_env.py --llm
+```
+
+### 3. Run the inference script
+
+```bash
+python inference.py
+```
+
+This script:
+
+- connects to `http://localhost:7860` by default
+- can call an OpenAI-compatible API
+- falls back to a built-in heuristic if the model output is missing or invalid
+
+### 4. Run seasonal experiments
+
+```bash
+python test_seasonal_llm.py --start-month January --days 30
+```
+
+This script is experimental and uses the separate `seasonal_trend_model.py` logic rather than the default core trend model used by the main environment.
+
+### 5. Generate or inspect shop metadata
+
+```bash
+python init_shops.py
+```
+
+Hardcoded-only mode:
+
+```bash
+python init_shops.py --hardcoded-only
+```
+
+### 6. Validate OpenEnv packaging
+
+```bash
+openenv validate
+```
+
+### 7. Use Docker
+
+```bash
+docker build -t campus-market .
+docker run -p 7860:7860 campus-market
+```
+
+### 8. Use the Gymnasium wrapper
 
 ```python
-import asyncio
+from campus_market_env.gym_env import CampusMarketGymEnv
 
-from campus_market_env import CampusMarketAction, CampusMarketEnvClient
-
-
-async def run() -> None:
-    env = CampusMarketEnvClient(base_url="http://localhost:7860")
-    await env.connect()
-    try:
-        result = await env.reset(seed=7)
-        result = await env.step(
-            CampusMarketAction(
-                price_adjustment=0.05,
-                marketing_spend=120.0,
-                restock_amount=12,
-                product_focus="cafe",
-            )
-        )
-        print(result.reward, result.done)
-    finally:
-        await env.close()
-
-
-asyncio.run(run())
+env = CampusMarketGymEnv(seed=7)
+obs, info = env.reset(seed=7)
+action = {
+    "price_adjustment": [0.0],
+    "marketing_spend": [100.0],
+    "restock_amount": [20],
+}
+next_obs, reward, terminated, truncated, info = env.step(action)
 ```
 
 ---
@@ -455,46 +714,40 @@ asyncio.run(run())
 
 ```text
 campusMarketRL/
-│
-├── __init__.py                         # Public package exports
-├── client.py                           # OpenEnv WebSocket client
-├── config.py                           # Core constants and simulation settings
-├── enums.py                            # Phase, shop type, and trend enums
-├── gym_env.py                          # Gymnasium wrapper + vector projection
-├── inference.py                        # Sample LLM/heuristic inference loop
-├── main.py                             # Local server entrypoint
-├── models.py                           # Pydantic action, observation, and state models
-├── openenv.yaml                        # OpenEnv environment descriptor
-├── pyproject.toml                      # Package metadata and dependencies
-├── requirements.txt                    # Python runtime dependencies
-├── test_env.py                         # Local smoke test
-├── validate-submission.sh              # HF Space + Docker + openenv validator
-│
-├── server/
-│   ├── app.py                          # FastAPI/OpenEnv app factory and CLI server
-│   ├── environment.py                  # CampusMarketEnv reset/step implementation
-│   ├── engine.py                       # Core simulation, reward, inventory, demand logic
-│   ├── state_manager.py                # Day/phase transitions and rolling memory
-│   ├── student_model.py                # Student cluster demand generation
-│   ├── competitor_model.py             # Competitor generation and pressure score
-│   ├── trend_model.py                  # Seasonal trend selection and multipliers
-│   ├── requirements.txt                # Alternate server dependency list
-│   └── Dockerfile                      # Server-focused container build
-│
+├── README.md
+├── pyproject.toml              # Package metadata and entry points
+├── requirements.txt            # Core dependencies
+├── openenv.yaml                # OpenEnv environment spec
+├── main.py                     # Local server entrypoint
+├── __init__.py                 # Package exports
+├── config.py                   # Simulation constants
+├── enums.py                    # Phase, shop type, trend enums
+├── models.py                   # Action, observation, and state models
+├── client.py                   # OpenEnv client wrapper
+├── gym_env.py                  # Gymnasium adapter
+├── inference.py                # LLM/heuristic inference loop
+├── test_env.py                 # Smoke test
+├── test_seasonal_llm.py        # Experimental seasonal/LLM script
+├── init_shops.py               # Shop initialization helper
+├── validate-submission.sh      # Submission validation helper
+├── docs/                       # Supplementary docs
+├── static/                     # Static landing page assets
 ├── tasks/
-│   ├── task_easy.py                    # 30-day baseline benchmark
-│   ├── task_medium.py                  # 60-day adaptive-pricing benchmark
-│   ├── task_hard.py                    # 90-day full-horizon benchmark
-│   ├── grader.py                       # Weighted grading and report generator
-│   └── grading_report.txt              # Latest generated benchmark report
-│
-├── static/
-│   └── index.html                      # Static HTML page asset
-│
-└── docs/
-    ├── GETTING_STARTED.md              # Onboarding notes
-    ├── QUICK_REFERENCE.md              # Endpoints and commands
-    └── IMPLEMENTATION_STATUS.md        # Architecture summary
+│   ├── definitions.py          # Benchmark task definitions
+│   ├── graders.py              # Grading functions
+│   └── __init__.py
+└── server/
+    ├── app.py                  # FastAPI/OpenEnv app
+    ├── environment.py          # Main environment class
+    ├── engine.py               # Core simulation logic
+    ├── state_manager.py        # Phase/day transitions and memory
+    ├── student_model.py        # Student demand generation
+    ├── competitor_model.py     # Competitor generation and pressure
+    ├── trend_model.py          # Core seasonal trend logic
+    ├── seasonal_trend_model.py # Experimental seasonal helper
+    ├── shop_generator.py       # Hardcoded + optional LLM shop metadata
+    ├── requirements.txt
+    └── Dockerfile
 ```
 
 ---
@@ -503,104 +756,47 @@ campusMarketRL/
 
 ### Environment Variables
 
-Create a `.env` file at the project root if you want to use `inference.py` with a hosted model:
+Example values from `.env.example`:
 
 ```bash
 HF_TOKEN=your_api_key_here
 API_BASE_URL=https://router.huggingface.co/v1
-MODEL_NAME=your-model-id
+MODEL_NAME=Qwen/Qwen2.5-72B-Instruct
 CAMPUS_MARKET_ENV_BASE_URL=http://localhost:7860
 TASK_NAME=campus_market_inference
 BENCHMARK=campus_market_env
 LOCAL_IMAGE_NAME=campus-market:latest
 ```
 
-### Market Configuration
+### Important Core Constants
 
-Key constants in `config.py`:
+From `config.py`:
 
-| Parameter | Default | Description |
-|-----------|---------|-------------|
-| `MAX_DAYS_PER_EPISODE` | `90` | Maximum episode length |
+| Constant | Value | Meaning |
+| --- | --- | --- |
+| `MAX_DAYS_PER_EPISODE` | `90` | Episode duration in days |
 | `PHASES_PER_DAY` | `3` | `morning`, `active`, `closing` |
-| `DEFAULT_BUDGET` | `10000.0` | Monthly operating budget |
-| `DEFAULT_AWARENESS` | `0.42` | Initial awareness level |
-| `DEFAULT_INVENTORY_LEVEL` | `0.72` | Starting normalized inventory |
-| `INVENTORY_CAPACITY_UNITS` | `400` | Capacity used for inventory conversion |
-| `INVENTORY_THRESHOLD` | `0.2` | Auto-restock trigger threshold |
-| `AUTO_RESTOCK_TARGET_LEVEL` | `0.45` | Auto-restock target level |
-| `AUTO_RESTOCK_UNIT_COST` | `1.8` | Cost per inventory unit |
-| `EVENT_INFLATION_PROBABILITY` | `0.03` | Inflation event chance |
-| `EVENT_SUPPLY_SHORTAGE_PROBABILITY` | `0.03` | Supply shortage event chance |
-| `EVENT_COMPETITOR_DISCOUNT_PROBABILITY` | `0.03` | Competitor discount event chance |
-
-### Gymnasium Interface
-
-`CampusMarketGymEnv` exposes:
-
-- A dictionary action space for the four control knobs
-- An 11-dimensional observation vector
-- Extra reset/step info containing the structured observation and market state
+| `DEFAULT_BUDGET` | `10000.0` | Monthly starting budget |
+| `DEFAULT_AWARENESS` | `0.42` | Initial awareness |
+| `DEFAULT_INVENTORY_LEVEL` | `0.72` | Initial inventory level |
+| `DEFAULT_CUSTOMER_SATISFACTION` | `0.58` | Initial satisfaction |
+| `INVENTORY_CAPACITY_UNITS` | `400` | Inventory capacity |
+| `INVENTORY_THRESHOLD` | `0.2` | Auto-restock trigger |
+| `AUTO_RESTOCK_TARGET_LEVEL` | `0.45` | Auto-restock target |
+| `BASE_PRICE` | `100.0` | Base item price |
+| `MEMORY_WINDOW_DAYS` | `7` | Rolling memory window |
+| `COMPETITOR_COUNT` | `4` | Number of competitor shops |
 
 ---
 
-## Key Design Decisions
+## Additional Notes
 
-| Decision | Rationale |
-|----------|-----------|
-| **Deterministic seeded simulation** | Reproducible experiments are critical for evaluation and debugging |
-| **Structured action interface** | Four interpretable controls keep the task learnable while still rich |
-| **Budget-constrained execution** | The environment clips unaffordable actions instead of allowing impossible spend |
-| **Student clusters instead of undifferentiated traffic** | Demand responds to preference, budget, and price sensitivity in a more realistic way |
-| **Competitor pressure as a first-class signal** | The agent must adapt to nearby shops, not just static demand |
-| **Inventory-aware reward shaping** | Policies are pushed away from both stockouts and bloated inventory |
-| **OpenEnv + Gym dual support** | Makes the environment usable for hosted evaluation, custom agents, and standard RL pipelines |
-| **Lightweight built-in interfaces** | The repo focuses on API access, an OpenEnv client, and a Gym wrapper instead of a separate app UI |
+- `seasonal_trend_model.py` is not the default trend system used by the core OpenEnv environment. The main environment uses `server/trend_model.py`.
+- `shop_generator.py` and `init_shops.py` provide auxiliary shop metadata tooling and can optionally use an external API.
 
----
+Potential future improvements:
 
-## Research Inspirations
-
-- **[OpenEnv](https://github.com/meta-pytorch/OpenEnv)** for the hosted environment interface pattern
-- **[Gymnasium](https://gymnasium.farama.org/)** for the vectorized RL wrapper interface
-- Retail operations heuristics around **pricing, stock control, and demand seasonality**
-- Deterministic simulation design for repeatable evaluation across policy variants
-
----
-
-## Contributing
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-change`)
-3. Make your changes
-4. Run local checks:
-   `python test_env.py`
-   `python tasks/grader.py`
-5. If relevant, run submission validation:
-   `openenv validate`
-6. Commit and open a pull request
-
-### Areas We'd Love Help With
-
-- New benchmark tasks with tougher business constraints
-- Better reward calibration for long-horizon budget preservation
-- Richer random events and campus calendar effects
-- Additional observation channels or partial-observability variants
-- Baseline RL agents and training scripts
-- Better environment inspection or debugging utilities around the existing API-based workflow
-
----
-
-## License
-
-No license file is currently included in this repository. If you plan to share or reuse it publicly, add a `LICENSE` file first so the usage terms are explicit.
-
----
-
-<div align="center">
-
-**Built as an OpenEnv-ready campus retail simulation**
-
-*A compact but expressive environment where pricing, inventory, marketing, seasonality, and competition all matter at the same time.*
-
-</div>
+- dedicated benchmark runner script in `tasks/`
+- baseline training scripts for Gymnasium agents
+- richer shop-specific dynamics per `shop_type`
+- more API examples for direct HTTP and WebSocket usage
