@@ -262,7 +262,7 @@ def main() -> None:
     print(f"  Grade: {easy.grade:.6f}")
     for c in easy.criteria:
         direction = "≥" if c.direction == "at_least" else "≤"
-        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.6f}")
+        print(f"    {c.name}: {c.actual:.6f} {direction} {c.target:.6f} → {c.score:.6f}")
     
     print("\n📊 Medium Task (60 days):")
     medium = grade_medium(
@@ -274,7 +274,7 @@ def main() -> None:
     print(f"  Grade: {medium.grade:.6f}")
     for c in medium.criteria:
         direction = "≥" if c.direction == "at_least" else "≤"
-        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.6f}")
+        print(f"    {c.name}: {c.actual:.6f} {direction} {c.target:.6f} → {c.score:.6f}")
     
     print("\n📊 Hard Task (90 days):")
     hard = grade_hard(
@@ -288,7 +288,7 @@ def main() -> None:
     print(f"  Grade: {hard.grade:.6f}")
     for c in hard.criteria:
         direction = "≥" if c.direction == "at_least" else "≤"
-        print(f"    {c.name}: {c.actual:.2f} {direction} {c.target:.2f} → {c.score:.6f}")
+        print(f"    {c.name}: {c.actual:.6f} {direction} {c.target:.6f} → {c.score:.6f}")
     
     overall = compute_overall_grade([easy, medium, hard])
     print("\n" + "=" * 70)

@@ -109,13 +109,13 @@ def log_start(task: str, env: str, model: str) -> None:
 def log_step(step: int, action: str, reward: float, done: bool, error: Optional[str]) -> None:
     error_value = error if error else "null"
     print(
-        f"[STEP] step={step} action={action} reward={reward:.2f} done={str(done).lower()} error={error_value}",
+        f"[STEP] step={step} action={action} reward={reward:.6f} done={str(done).lower()} error={error_value}",
         flush=True,
     )
 
 
 def log_end(success: bool, steps: int, score: float, rewards: list[float]) -> None:
-    rewards_str = ",".join(f"{reward:.2f}" for reward in rewards)
+    rewards_str = ",".join(f"{reward:.6f}" for reward in rewards)
     print(
         f"[END] success={str(success).lower()} steps={steps} score={score:.6f} rewards={rewards_str}",
         flush=True,
@@ -319,12 +319,12 @@ async def run_task(client: OpenAI | None, task_name: str, env: CampusMarketEnvCl
                     [
                         f"step={step}",
                         f"action={action_to_log_string(action)}",
-                        f"reward={reward:.2f}",
+                        f"reward={reward:.6f}",
                         f"day={observation.day}",
                         f"phase={observation.phase}",
-                        f"satisfaction={observation.customer_satisfaction:.3f}",
-                        f"inventory={observation.inventory_level:.3f}",
-                        f"budget={observation.monthly_budget:.2f}",
+                        f"satisfaction={observation.customer_satisfaction:.4f}",
+                        f"inventory={observation.inventory_level:.4f}",
+                        f"budget={observation.monthly_budget:.6f}",
                     ]
                 )
             )
