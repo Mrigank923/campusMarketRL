@@ -26,15 +26,6 @@ class LLMActionResponse(BaseModel):
     price_adjustment: float = Field(ge=-1.0, le=1.0)
     marketing_spend: float = Field(ge=0.0)
     restock_amount: int = Field(ge=0)
-    product_focus: str
-
-    @field_validator("product_focus")
-    @classmethod
-    def validate_product_focus(cls, value: str) -> str:
-        normalized = value.strip().lower()
-        if normalized not in VALID_PRODUCT_FOCUS:
-            raise ValueError(f"product_focus must be one of {VALID_PRODUCT_FOCUS}")
-        return normalized
 
 
 def load_env_file(path: Path) -> None:
@@ -80,7 +71,6 @@ TASK_STEPS = {
     "hard_full_horizon": 30 * 3,  # 30 days * 3 phases
 }
 
-VALID_PRODUCT_FOCUS: Final[tuple[str, ...]] = tuple(shop.value for shop in ShopTypeEnum)
 
 SYSTEM_PROMPT = textwrap.dedent(
     """
@@ -94,7 +84,6 @@ SYSTEM_PROMPT = textwrap.dedent(
       "price_adjustment": float,   // between -1.0 and 1.0
       "marketing_spend": float,    // >= 0
       "restock_amount": int,       // >= 0
-      "product_focus": "cafe" | "food" | "tech" | "stationary"
     }
 
     Do not include markdown, explanations, or extra text.
@@ -150,20 +139,10 @@ def safe_default_action(observation: CampusMarketObservation) -> CampusMarketAct
     else:
         marketing_spend = min(180.0, observation.monthly_budget * 0.03)
 
-    if observation.trend_factor > 1.1:
-        product_focus = ShopTypeEnum.TECH.value
-    elif observation.trend_factor < 0.8:
-        product_focus = ShopTypeEnum.FOOD.value
-    elif observation.phase == "morning":
-        product_focus = ShopTypeEnum.CAFE.value
-    else:
-        product_focus = ShopTypeEnum.STATIONARY.value
-
     return CampusMarketAction(
         price_adjustment=round(price_adjustment, 2),
         marketing_spend=round(marketing_spend, 2),
         restock_amount=restock_amount,
-        product_focus=product_focus,
     )
 
 
@@ -233,7 +212,6 @@ def choose_action(
             price_adjustment=parsed.price_adjustment,
             marketing_spend=parsed.marketing_spend,
             restock_amount=parsed.restock_amount,
-            product_focus=parsed.product_focus,
         )
         return action, None
     except (ValidationError, ValueError, TypeError, KeyError, IndexError, AttributeError) as exc:

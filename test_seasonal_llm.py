@@ -126,7 +126,6 @@ def get_heuristic_action(observation: dict) -> dict:
         "price_adjustment": 0.0,
         "marketing_spend": min(100.0, observation["monthly_budget"] * 0.1),
         "restock_amount": max(0, int(20 * (1.0 - observation["inventory_level"]))),
-        "product_focus": "cafe",
         "reasoning": "Heuristic fallback: balanced strategy",
     }
 

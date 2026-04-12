@@ -53,7 +53,7 @@ def load_api_config() -> tuple[Optional[str], str, str]:
 SYSTEM_PROMPT = textwrap.dedent(
     """
     You are controlling a campus shop. Maximize long-term reward.
-    Return only valid JSON with: price_adjustment, marketing_spend, restock_amount, product_focus.
+    Return only valid JSON with: price_adjustment, marketing_spend, restock_amount.
     """
 ).strip()
 
@@ -69,7 +69,7 @@ def get_llm_action(client: OpenAI, observation: dict, step: int) -> Optional[Cam
 - Budget: ${observation['monthly_budget']:.0f}
 - Trend: {observation['trend_factor']:.2f}x
 
-Return JSON only: {{"price_adjustment": float, "marketing_spend": float, "restock_amount": int, "product_focus": str}}"""
+Return JSON only: {{"price_adjustment": float, "marketing_spend": float, "restock_amount": int}}"""
 
         completion = client.chat.completions.create(
             model="gpt-4",
@@ -89,7 +89,6 @@ Return JSON only: {{"price_adjustment": float, "marketing_spend": float, "restoc
                 price_adjustment=float(parsed.get("price_adjustment", 0.0)),
                 marketing_spend=float(parsed.get("marketing_spend", 0.0)),
                 restock_amount=int(parsed.get("restock_amount", 0)),
-                product_focus=str(parsed.get("product_focus", "cafe")).lower(),
             )
     except Exception as e:
         print(f"  LLM error: {e}")
@@ -101,13 +100,11 @@ def get_heuristic_action(observation: dict) -> CampusMarketAction:
     restock = 30 if observation["inventory_level"] < 0.45 else 10
     price_adj = -0.1 if observation["customer_satisfaction"] < 0.5 else 0.0
     marketing = 200.0 if observation["awareness"] < 0.5 else 100.0
-    focus = "tech" if observation["trend_factor"] > 1.1 else "cafe"
 
     return CampusMarketAction(
         price_adjustment=price_adj,
         marketing_spend=marketing,
         restock_amount=restock,
-        product_focus=focus,
     )
 
 
@@ -118,7 +115,6 @@ def main() -> None:
     args = parser.parse_args()
 
     rng = np.random.default_rng(7)
-    shop_types = [shop_type.value for shop_type in ShopTypeEnum]
     emit_start(script="test_env", seed=7)
 
     # Initialize LLM if requested
@@ -150,7 +146,6 @@ def main() -> None:
                 price_adjustment=float(rng.uniform(-0.3, 0.4)),
                 marketing_spend=float(rng.uniform(0.0, 800.0)),
                 restock_amount=int(rng.integers(0, 80)),
-                product_focus=str(rng.choice(shop_types)),
             )
 
         observation = env.step(action)
